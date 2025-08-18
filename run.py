@@ -6,7 +6,9 @@ import stopit
 import typer
 
 from benchmark.config_read import read_dataset_config, read_engine_configs
-from benchmark.dataset import Dataset
+# Defer heavy imports that pull optional dependencies (like h5py)
+# into runtime so `--help` and other CLI introspection won't fail
+# when those optional packages aren't installed.
 from engine.base_client import IncompatibilityError
 from engine.clients.client_factory import ClientFactory
 
@@ -18,12 +20,18 @@ def run(
     engines: List[str] = typer.Option(["*"]),
     datasets: List[str] = typer.Option(["*"]),
     host: str = "localhost",
-    skip_upload: bool = False,
-    skip_search: bool = False,
+    skip_upload: bool = typer.Option(
+        False, "--skip-upload/--no-skip-upload", help="Skip the upload step"
+    ),
+    skip_search: bool = typer.Option(
+        False, "--skip-search/--no-skip-search", help="Skip the search step"
+    ),
     skip_if_exists: bool = False,
     exit_on_error: bool = True,
     timeout: float = 86400.0,
-    skip_configure: Optional[bool] = False,
+    skip_configure: bool = typer.Option(
+        False, "--skip-configure/--no-skip-configure", help="Skip engine configuration"
+    ),
 ):
     """
     Examples:
@@ -34,6 +42,11 @@ def run(
     """
     all_engines = read_engine_configs()
     all_datasets = read_dataset_config()
+    if not all_engines:
+        raise ValueError("No engines found. Please check your engine configurations.")
+
+    if not all_datasets:
+        raise ValueError("No datasets found. Please check your dataset configurations.")
 
     selected_engines = {
         name: config
@@ -51,6 +64,9 @@ def run(
             print(f"Running experiment: {engine_name} - {dataset_name}")
             client = ClientFactory(host).build_client(engine_config)
             try:
+
+                # Import Dataset here to avoid requiring optional deps at import time
+                from benchmark.dataset import Dataset
 
                 dataset = Dataset(dataset_config)
                 if dataset.config.type == "sparse" and not client.sparse_vector_support:
