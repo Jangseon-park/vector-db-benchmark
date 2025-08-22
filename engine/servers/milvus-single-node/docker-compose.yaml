@@ -45,6 +45,11 @@ services:
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
+      # Add new environment variables for low-resource environments
+      QUERY_NODE_MEMORY_LIMIT: 2048 # MB
+      DATA_NODE_MEMORY_LIMIT: 2048 # MB
+      INDEX_NODE_MEMORY_LIMIT: 2048 # MB
+      ROOT_COORD_MEMORY_LIMIT: 1024 # MB
     logging:
       driver: "json-file"
       options:
@@ -58,7 +63,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 25Gb
+          memory: 3Gb
 
 networks:
   default:
