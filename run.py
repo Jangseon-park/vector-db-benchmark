@@ -32,6 +32,9 @@ def run(
     skip_configure: bool = typer.Option(
         False, "--skip-configure/--no-skip-configure", help="Skip engine configuration"
     ),
+    check_loaded: bool = typer.Option(
+        False, "--check-loaded", help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)"
+    ),
 ):
     """
     Examples:
@@ -74,6 +77,47 @@ def run(
                         f"{client.name} engine does not support sparse vectors"
                     )
                 dataset.download()
+
+                # If user only wants to check that collections are loaded,
+                # initialize uploader client and call ensure_loaded(), then
+                # skip running the full experiment and exit after checking
+                # all selected combinations.
+                if check_loaded:
+                    # Best-effort: call uploader.init_client and uploader.ensure_loaded
+                    try:
+                        # uploader instance lives on the client object
+                        if hasattr(client.uploader, "init_client"):
+                            client.uploader.init_client(
+                                client.uploader.host,
+                                dataset.config.distance,
+                                client.uploader.connection_params,
+                                client.uploader.upload_params,
+                            )
+                    except Exception:
+                        pass
+
+                    try:
+                        if hasattr(client.uploader, "ensure_loaded"):
+                            print(
+                                f"Waiting for collection to become available for {engine_name} - {dataset_name}..."
+                            )
+                            client.uploader.ensure_loaded()
+                            print(
+                                f"Collection available for {engine_name} - {dataset_name}"
+                            )
+                        else:
+                            print(
+                                f"Uploader for {engine_name} does not support ensure_loaded(), skipping"
+                            )
+                    except Exception as e:
+                        print(
+                            f"Collection did not become available for {engine_name} - {dataset_name}:",
+                            e,
+                        )
+
+                    client.delete_client()
+                    # continue to next dataset/engine; after loop completes program will exit
+                    continue
 
                 with stopit.ThreadingTimeout(timeout) as tt:
                     client.run_experiment(
