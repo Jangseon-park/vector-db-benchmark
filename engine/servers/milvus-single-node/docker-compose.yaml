@@ -1,4 +1,3 @@
-version: '3.5'
 # Based on https://milvus.io/docs/install_standalone-docker.md#Download-the-YAML-file
 
 services:
