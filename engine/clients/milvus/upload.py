@@ -6,6 +6,7 @@ from pymilvus import (
     MilvusException,
     connections,
     wait_for_index_building_complete,
+    wait_for_loading_complete,
 )
 
 from dataset_reader.base_reader import Record
@@ -96,36 +97,25 @@ class MilvusUploader(BaseUploader):
         return {}
 
     @classmethod
-    def ensure_loaded(cls, timeout: int = 300, poll_interval: float = 1.0):
+    def ensure_loaded(cls):
         """Ensure the collection is loaded and accessible.
 
-        This calls Collection.load() and then polls collection metadata
-        (num_entities) until it succeeds or the timeout is reached.
-        It helps avoid "channel not subscribed" or recovery-related errors
-        after a Milvus restart by giving the server time to recover and
-        subscribe to channels.
+        This calls Collection.load() and then waits indefinitely until the
+        loading is complete.
 
         Raises MilvusException on timeout or if no collection is set.
         """
-        import time
-
         if cls.collection is None:
             raise MilvusException("Milvus collection is not initialized")
 
-        try:
-            cls.collection.load()
-        except Exception:
-            # best-effort: we'll still poll for metadata availability
-            pass
-
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            try:
-                # Accessing num_entities touches metadata and will raise
-                # if the collection is not ready yet.
-                _ = cls.collection.num_entities
-                return True
-            except MilvusException:
-                time.sleep(poll_interval)
-
-        raise MilvusException(f"Timed out waiting for collection to become available after {timeout}s")
+        import time
+        start_time = time.time()
+        print("Starting collection load...")
+        cls.collection.load()
+        wait_for_loading_complete(
+            collection_name=MILVUS_COLLECTION_NAME, using=MILVUS_DEFAULT_ALIAS
+        )
+        print("Collection loaded successfully.")
+        elapsed_time = time.time() - start_time
+        print(f"Load finished in {elapsed_time:.2f}s")
+        return True
