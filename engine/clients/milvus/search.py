@@ -12,6 +12,7 @@ from engine.clients.milvus.config import (
     MILVUS_DEFAULT_PORT,
 )
 from engine.clients.milvus.parser import MilvusConditionParser
+from engine.clients.milvus.upload import MilvusUploader
 
 
 class MilvusSearcher(BaseSearcher):
@@ -40,6 +41,16 @@ class MilvusSearcher(BaseSearcher):
     @classmethod
     def search_one(cls, query: Query, top: int) -> List[Tuple[int, float]]:
         param = {"metric_type": cls.distance, "params": cls.search_params["config"]}
+        # quick readiness check: accessing num_entities will raise if collection not ready
+        try:
+            _ = cls.collection.num_entities
+        except Exception:
+            # Wait for collection to become available (best-effort)
+            try:
+                MilvusUploader.ensure_loaded()
+            except Exception:
+                # If ensure_loaded fails, proceed to attempt search and let caller handle the error
+                pass
         try:
             res = cls.collection.search(
                 data=[query.vector],

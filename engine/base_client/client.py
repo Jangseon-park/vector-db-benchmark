@@ -126,6 +126,31 @@ class BaseClient:
 
         if not skip_search:
             print("Experiment stage: Search")
+            # If upload was skipped, the collection may not be loaded in Milvus
+            # after a server restart. If the uploader provides an ensure_loaded()
+            # helper (MilvusUploader), call it once to wait for recovery.
+            if skip_upload and hasattr(self.uploader, "ensure_loaded"):
+                try:
+                    print("Upload skipped — initializing uploader client and waiting for collection to become available...")
+                    # Ensure uploader client is initialized (class-level init_client may be required)
+                    try:
+                        # uploader.init_client is a classmethod on uploader implementations
+                        self.uploader.init_client(
+                            self.uploader.host,
+                            dataset.config.distance,
+                            self.uploader.connection_params,
+                            self.uploader.upload_params,
+                        )
+                    except Exception:
+                        # ignore failures from init_client; ensure_loaded will still try
+                        pass
+
+                    # default timeout is implemented by the uploader.ensure_loaded
+                    self.uploader.ensure_loaded()
+                    print("Collection is available — proceeding with search")
+                except Exception as e:
+                    print("Warning: waiting for collection availability failed:", e)
+                    # Continue and let individual searches handle failures
             for search_id, searcher in enumerate(self.searchers):
 
                 if skip_if_exists:

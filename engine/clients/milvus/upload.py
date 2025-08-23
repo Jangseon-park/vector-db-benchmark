@@ -94,3 +94,38 @@ class MilvusUploader(BaseUploader):
 
         cls.collection.load()
         return {}
+
+    @classmethod
+    def ensure_loaded(cls, timeout: int = 300, poll_interval: float = 1.0):
+        """Ensure the collection is loaded and accessible.
+
+        This calls Collection.load() and then polls collection metadata
+        (num_entities) until it succeeds or the timeout is reached.
+        It helps avoid "channel not subscribed" or recovery-related errors
+        after a Milvus restart by giving the server time to recover and
+        subscribe to channels.
+
+        Raises MilvusException on timeout or if no collection is set.
+        """
+        import time
+
+        if cls.collection is None:
+            raise MilvusException("Milvus collection is not initialized")
+
+        try:
+            cls.collection.load()
+        except Exception:
+            # best-effort: we'll still poll for metadata availability
+            pass
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                # Accessing num_entities touches metadata and will raise
+                # if the collection is not ready yet.
+                _ = cls.collection.num_entities
+                return True
+            except MilvusException:
+                time.sleep(poll_interval)
+
+        raise MilvusException(f"Timed out waiting for collection to become available after {timeout}s")
