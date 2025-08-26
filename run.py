@@ -61,7 +61,10 @@ def run(
         for name, config in all_datasets.items()
         if any(fnmatch.fnmatch(name, dataset) for dataset in datasets)
     }
-
+    for engine_name, engine_config in selected_engines.items():
+        for dataset_name, dataset_config in selected_datasets.items():
+            print(f"selected experiment: {engine_name} - {dataset_name}")
+    
     for engine_name, engine_config in selected_engines.items():
         for dataset_name, dataset_config in selected_datasets.items():
             print(f"Running experiment: {engine_name} - {dataset_name}")

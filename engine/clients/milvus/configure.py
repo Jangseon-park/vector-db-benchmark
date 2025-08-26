@@ -41,11 +41,17 @@ class MilvusConfigurator(BaseConfigurator):
         print("established connection")
 
     def clean(self):
-        try:
-            utility.drop_collection(MILVUS_COLLECTION_NAME, using=MILVUS_DEFAULT_ALIAS)
-            utility.has_collection(MILVUS_COLLECTION_NAME, using=MILVUS_DEFAULT_ALIAS)
-        except MilvusException:
-            pass
+        if utility.has_collection(MILVUS_COLLECTION_NAME, using=MILVUS_DEFAULT_ALIAS):
+            try:
+                collection = Collection(MILVUS_COLLECTION_NAME, using=MILVUS_DEFAULT_ALIAS)
+                # Before dropping a collection, you need to load it and release it from memory.
+                collection.load()
+                collection.release()
+                utility.drop_collection(MILVUS_COLLECTION_NAME, using=MILVUS_DEFAULT_ALIAS)
+            except MilvusException as e:
+                # If something goes wrong, we still want to log it for debugging
+                print(f"Failed to clean up collection: {e}")
+                pass
 
     def recreate(self, dataset: Dataset, collection_params):
         idx = FieldSchema(
@@ -71,14 +77,11 @@ class MilvusConfigurator(BaseConfigurator):
                 raise IncompatibilityError(e)
         schema = CollectionSchema(fields=fields, description=MILVUS_COLLECTION_NAME)
 
-        collection = Collection(
+        Collection(
             name=MILVUS_COLLECTION_NAME,
             schema=schema,
             using=MILVUS_DEFAULT_ALIAS,
         )
-
-        for index in collection.indexes:
-            index.drop()
 
     def execution_params(self, distance, vector_size):
         return {"normalize": distance == Distance.COSINE}
