@@ -45,10 +45,11 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
       # Add new environment variables for low-resource environments
-      QUERY_NODE_MEMORY_LIMIT: 2048 # MB
-      DATA_NODE_MEMORY_LIMIT: 2048 # MB
-      INDEX_NODE_MEMORY_LIMIT: 2048 # MB
-      ROOT_COORD_MEMORY_LIMIT: 1024 # MB
+      # reduce memory limit to 256MB
+      QUERY_NODE_MEMORY_LIMIT: 64 # MB
+      DATA_NODE_MEMORY_LIMIT: 64 # MB
+      INDEX_NODE_MEMORY_LIMIT: 64 # MB
+      ROOT_COORD_MEMORY_LIMIT: 32 # MB
     logging:
       driver: "json-file"
       options:

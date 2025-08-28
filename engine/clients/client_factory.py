@@ -102,11 +102,12 @@ class ClientFactory(ABC):
 
         return engine_searchers
 
-    def build_client(self, experiment):
+    def build_client(self, experiment, drop_caches: bool = False):
         return BaseClient(
             name=experiment["name"],
             engine=experiment["engine"],
             configurator=self._create_configurator(experiment),
             uploader=self._create_uploader(experiment),
             searchers=self._create_searchers(experiment),
+            drop_caches=drop_caches,
         )

@@ -113,6 +113,10 @@ queryNode:
   cacheSize: 4.096 # GB, 4096MB. Must be less than system memory size.
   gracefulTime: 0 # Minimum time before the newly inserted data can be searched (in ms)
   port: 21123
+  loadMemoryUsageFactor: 1 # The factor of memory usage for loading data.
+  enableDisk: true
+  maxDiskUsagePercentage: 90 # The maximum disk usage percentage.
+
 
   grpc:
     serverMaxRecvSize: 2147483647 # math.MaxInt32

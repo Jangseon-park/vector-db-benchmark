@@ -30,6 +30,16 @@ from engine.clients.milvus.config import (
 # Use the same collection name as in the benchmark runs
 MILVUS_COLLECTION_NAME = "benchmark"
 
+def remove_volumes(model: str, size: int):
+    path = os.path.join(
+        os.path.dirname(__file__), "engine", "servers", f"{model}", f"{size}"
+    )   
+    volume_path = os.path.join(path, "volumes")
+    if os.path.exists(volume_path):
+        subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
+        print("Volumes directory removed.")
+    else:
+        print("Volumes directory does not exist.")
 
 def start_docker_containers(size: int):
     path = os.path.join(
@@ -37,13 +47,17 @@ def start_docker_containers(size: int):
     )
 
     # Clean up previous run's volumes before starting for a clean slate
+    #
+    #volume_path = os.path.join(path, "volumes")
+    #if os.path.exists(volume_path):
+    #    print("Removing existing volumes for a clean start...")
+    #    # Use sudo to remove the directory which is owned by root (from docker)
+    #    subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
+    #    print("Volumes directory removed.")
+    is_exist = False
     volume_path = os.path.join(path, "volumes")
     if os.path.exists(volume_path):
-        print("Removing existing volumes for a clean start...")
-        # Use sudo to remove the directory which is owned by root (from docker)
-        subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
-        print("Volumes directory removed.")
-
+        is_exist = True
     try:
         # Use check=True to catch errors if docker-compose fails
         print("Starting Milvus containers...")
@@ -52,7 +66,7 @@ def start_docker_containers(size: int):
         raise Exception(f"Failed to start containers: {e}")
 
     # Wait for a moment to ensure the service is responsive
-    time.sleep(15)
+    time.sleep(5)
 
     # check if the containers are running
     if (
@@ -76,7 +90,7 @@ def start_docker_containers(size: int):
         raise Exception("Milvus containers did not start or are not running")
     else:
         print("Milvus containers started")
-    return path
+    return is_exist
 
 
 def stop_docker_containers(size: int):
@@ -105,12 +119,12 @@ def stop_docker_containers(size: int):
         # but we leave it as a last resort.
         print("Warning: Milvus containers did not appear to stop cleanly.")
 
-    volume_path = os.path.join(path, "volumes")
-    if os.path.exists(volume_path):
-        print("Removing existing volumes for a clean start...")
-        # Use sudo to remove the directory which is owned by root (from docker)
-        subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
-        print("Volumes directory removed.")
+    #volume_path = os.path.join(path, "volumes")
+    #if os.path.exists(volume_path):
+    #    print("Removing existing volumes for a clean start...")
+    #    # Use sudo to remove the directory which is owned by root (from docker)
+    #    subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
+    #    print("Volumes directory removed.")
 
 def upload_dataset(dataset_name: str, engine_name: str):
     path = os.path.dirname(__file__)
@@ -126,6 +140,7 @@ def upload_dataset(dataset_name: str, engine_name: str):
         dataset_name,
         "--no-skip-upload",
         "--skip-search",
+        "--drop-caches",
     ]
     # flush the cache
     print("Flushing system cache...")
@@ -172,6 +187,7 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
         dataset_name,
         "--skip-upload",
         "--no-skip-search",
+        "--drop-caches",
     ]
     # flush the cache
     print("Flushing system cache...")
@@ -212,65 +228,43 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
 
 
     
-def wait_for_indexing_completion():
-    """Connects to Milvus and waits for indexing and compaction to complete."""
-    print("Connecting to Milvus to wait for indexing completion...")
-    connections.connect("default", host="localhost", port="19530")
+def confirm_loaded(dataset_name: str, engine_name: str, size: int):
+    path = os.path.dirname(__file__)
+    python_executable = sys.executable
+    cmd = [python_executable, "run.py", "--engines", engine_name, "--datasets", dataset_name, "--check-loaded"]
+    print(f"Running check-loaded command: {' '.join(cmd)}")
+    # This is the main, blocking operation.
+    subprocess.run(cmd, cwd=path, check=True)
+    print("Check-loaded command finished.")
 
-    if not utility.has_collection(MILVUS_COLLECTION_NAME):
-        print(f"Collection {MILVUS_COLLECTION_NAME} not found. Skipping wait.")
-        connections.disconnect("default")
-        return
-
-    try:
-        collection = Collection(MILVUS_COLLECTION_NAME)
-        print(f"Flushing collection '{MILVUS_COLLECTION_NAME}'...")
-        collection.flush()
-        print("Flush completed. Now waiting for indexing...")
-
-        while True:
-            progress = utility.index_building_progress(MILVUS_COLLECTION_NAME)
-            if not progress or progress.get("total_rows", 0) == progress.get("indexed_rows", 0):
-                print("Indexing appears to be complete.")
-                break
-            else:
-                print(f"Indexing in progress: {progress.get('indexed_rows', 0)} / {progress.get('total_rows', 0)} rows indexed.")
-            time.sleep(10)
-        
-        print("Waiting for any compaction to complete...")
-        while True:
-            compaction_state = collection.get_compaction_state()
-            if compaction_state.state.name == 'Completed':
-                 print("Compaction is complete.")
-                 break
-            else:
-                print(f"Compaction in progress, state: {compaction_state.state.name}...")
-            time.sleep(10)
-
-    except Exception as e:
-        print(f"An error occurred while waiting for indexing: {e}")
-    finally:
-        connections.disconnect("default")
-        print("Disconnected from Milvus.")
+def clear_all_collections():
+    engine_config = ["milvus-single-node"]
+    size_config = [256, 512, 768, 1024, 2048, 4096]
+    for engine_name in engine_config:
+        for size in size_config:
+            remove_volumes(engine_name, size)
 
 
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
+        "glove-100-angular",
         "gist-960-angular",
         "dbpedia-openai-1M-1536-angular",
     ]
     size_config = [256, 512, 768, 1024, 2048, 4096]
     iteration_num = 3
     for dataset_name in dataset_config:
+        clear_all_collections()
         for engine_name in engine_config:
             for size in size_config:
                 for i in range(iteration_num):
                     print(f"Running iteration {i} of {iteration_num} for {dataset_name} with {engine_name} and size {size}")
                     try:
-                        start_docker_containers(size)
-                        upload_dataset(dataset_name, engine_name)
-                        wait_for_indexing_completion()
+                        is_exist = start_docker_containers(size)
+                        if not is_exist:
+                            upload_dataset(dataset_name, engine_name)
+                        confirm_loaded(dataset_name, engine_name, size)
                         run_profile(dataset_name, engine_name, size, i)
                         stop_docker_containers(size)
                     finally:

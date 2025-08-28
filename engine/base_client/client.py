@@ -23,12 +23,14 @@ class BaseClient:
         configurator: BaseConfigurator,
         uploader: BaseUploader,
         searchers: List[BaseSearcher],
+        drop_caches: bool = False,
     ):
         self.name = name
+        self.engine = engine
         self.configurator = configurator
         self.uploader = uploader
         self.searchers = searchers
-        self.engine = engine
+        self.drop_caches = drop_caches
 
     @property
     def sparse_vector_support(self):
@@ -164,6 +166,16 @@ class BaseClient:
                             f"Skipping search {search_id} as it already exists",
                         )
                         continue
+                # add flush system call
+                if self.drop_caches:
+                    if os.geteuid() == 0:
+                        # add flush system call
+                        os.system("sync")
+                        os.system("echo 3 > /proc/sys/vm/drop_caches")
+                    else:
+                        # add flush system call
+                        os.system("sync")
+                        os.system("sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'")
 
                 search_params = {**searcher.search_params}
                 search_stats = searcher.search_all(

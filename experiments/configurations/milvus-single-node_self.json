@@ -5,6 +5,6 @@
     "connection_params": {},
     "collection_params": {},
     "search_params": [{ "parallel": 1, "config": { "ef": 128 } }, { "parallel": 100, "config": { "ef": 128 } }],
-    "upload_params": { "parallel": 16, "index_params": { "efConstruction": 100, "M": 16, "nlist": 512 }, "index_type": "IVF_FLAT" }
+    "upload_params": { "parallel": 16, "index_params": { "efConstruction": 100, "M": 16}, "index_type": "HNSW" }
   }
 ]

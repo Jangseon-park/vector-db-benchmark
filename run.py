@@ -35,6 +35,9 @@ def run(
     check_loaded: bool = typer.Option(
         False, "--check-loaded", help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)"
     ),
+    drop_caches: bool = typer.Option(
+        False, "--drop-caches/--no-drop-caches", help="Drop caches before search"
+    ),
 ):
     """
     Examples:
@@ -65,7 +68,7 @@ def run(
     for engine_name, engine_config in selected_engines.items():
         for dataset_name, dataset_config in selected_datasets.items():
             print(f"Running experiment: {engine_name} - {dataset_name}")
-            client = ClientFactory(host).build_client(engine_config)
+            client = ClientFactory(host).build_client(engine_config, drop_caches=drop_caches)
             try:
 
                 # Import Dataset here to avoid requiring optional deps at import time
