@@ -105,6 +105,12 @@ def stop_docker_containers(size: int):
         # but we leave it as a last resort.
         print("Warning: Milvus containers did not appear to stop cleanly.")
 
+    volume_path = os.path.join(path, "volumes")
+    if os.path.exists(volume_path):
+        print("Removing existing volumes for a clean start...")
+        # Use sudo to remove the directory which is owned by root (from docker)
+        subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
+        print("Volumes directory removed.")
 
 def upload_dataset(dataset_name: str, engine_name: str):
     path = os.path.dirname(__file__)
@@ -143,7 +149,7 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
     path = os.path.dirname(__file__)
     # Use sys.executable to ensure we are using the same python interpreter
     # that is running this script (which is the one from the poetry venv)
-    output_path = os.path.join(path, f"profile_results/{size}", f"{dataset_name}_{engine_name}_{iteration_num}.txt")
+    output_path = os.path.join(path, f"profile_results/{dataset_name}/{size}", f"{engine_name}_{iteration_num}.txt")
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
 
@@ -251,11 +257,8 @@ def wait_for_indexing_completion():
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
-        #"glove-25-angular",
-        "glove-100-angular",
-        #"deep-image-96-angular",
-        #"gist-960-angular",
-        #"dbpedia-openai-1M-1536-angular",
+        "gist-960-angular",
+        "dbpedia-openai-1M-1536-angular",
     ]
     size_config = [256, 512, 768, 1024, 2048, 4096]
     iteration_num = 3

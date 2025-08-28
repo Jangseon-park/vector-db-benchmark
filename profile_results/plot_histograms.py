@@ -52,7 +52,8 @@ def create_histogram_from_log(file_path, output_dir, sub_dir_prefix):
     ax.bar(labels, values)
     
     # Formatting
-    ax.set_title(f'Event Histogram for\n{os.path.basename(file_path)}', fontsize=16)
+    title_prefix = sub_dir_prefix.replace(os.path.sep, ' - ')
+    ax.set_title(f'Event Histogram for: {title_prefix}\n{os.path.basename(file_path)}', fontsize=16)
     ax.set_xlabel('PID-COMM-EVENT', fontsize=12)
     ax.set_ylabel('Accumulated Call Number', fontsize=12)
     
@@ -61,9 +62,12 @@ def create_histogram_from_log(file_path, output_dir, sub_dir_prefix):
 
     # --- Saving the plot ---
     base_filename = os.path.splitext(os.path.basename(file_path))[0]
-    # Prepend the sub-directory name to the output filename to ensure uniqueness
-    if sub_dir_prefix and sub_dir_prefix != '.':
-        output_filename = f"{sub_dir_prefix}_{base_filename}.png"
+    
+    # Sanitize the prefix by replacing path separators with underscores
+    safe_prefix = sub_dir_prefix.replace(os.path.sep, '_')
+
+    if safe_prefix and safe_prefix != '.':
+        output_filename = f"{safe_prefix}_{base_filename}.png"
     else:
         output_filename = f"{base_filename}.png"
     output_path = os.path.join(output_dir, output_filename)
@@ -89,9 +93,11 @@ def main():
 
     # Walk through all subdirectories of the current directory
     for root, _, files in os.walk(script_dir):
-        if root == histograms_dir: # Don't process the output directory
+        # Don't process the output directory itself
+        if os.path.commonpath([root, histograms_dir]) == histograms_dir:
             continue
 
+        # Get the relative path from the script's dir to the current root
         sub_dir_prefix = os.path.relpath(root, script_dir)
             
         for file in files:

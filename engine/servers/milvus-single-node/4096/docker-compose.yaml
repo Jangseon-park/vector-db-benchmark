@@ -59,10 +59,6 @@ services:
     depends_on:
       - "etcd"
       - "minio"
-    deploy:
-      resources:
-        limits:
-          memory: 3Gb
 
 networks:
   default:

@@ -34,15 +34,15 @@ def main():
     log files, and writes a summary CSV.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_csv_path = os.path.join(script_dir, "summary.csv")
+    output_csv_path = os.path.join(script_dir, "summary_transposed.csv")
 
     # This will store the data in a nested dictionary format:
-    # { 'comm-event': { 'size-iteration': count, ... }, ... }
+    # { 'comm-event': { 'dataset-size-iteration': count, ... }, ... }
     aggregated_data = defaultdict(dict)
     
     # These sets will keep track of all unique rows and columns
     all_comm_events = set()
-    all_size_iterations = set()
+    all_columns = set()
 
     print("Scanning for log files...")
 
@@ -56,18 +56,27 @@ def main():
             if file.endswith(".txt"):
                 file_path = os.path.join(root, file)
                 
-                # --- Extract size and iteration from path/filename ---
+                # --- Extract dataset, size, and iteration from path/filename ---
                 try:
-                    # Size is the name of the parent directory
-                    size = os.path.basename(root)
+                    # The path relative to the script directory gives us dataset/size
+                    relative_path = os.path.relpath(root, script_dir)
+                    path_parts = relative_path.split(os.path.sep)
+                    
+                    if len(path_parts) < 2: # Expecting at least dataset/size
+                        print(f"Skipping file in unexpected directory structure: {file_path}")
+                        continue
+                        
+                    dataset = path_parts[0]
+                    size = path_parts[1]
+                    
                     # Iteration is the last part of the filename before .txt
                     iteration = os.path.splitext(file)[0].split('_')[-1]
                     
                     if not size.isdigit() or not iteration.isdigit():
                         continue
                         
-                    col_header = f"{size}-{iteration}"
-                    all_size_iterations.add(col_header)
+                    col_header = f"{dataset}-{size}-{iteration}"
+                    all_columns.add(col_header)
                     
                     # --- Parse the file and aggregate data ---
                     file_counts = parse_log_file(file_path)
@@ -85,41 +94,51 @@ def main():
         return
 
     # --- Prepare data for CSV writing ---
-    # Sort rows alphabetically and columns numerically by size, then iteration
+    # Sort rows alphabetically and columns by dataset, then numerically by size and iteration
     sorted_comm_events = sorted(list(all_comm_events))
-    sorted_size_iterations = sorted(list(all_size_iterations), 
-                                    key=lambda x: tuple(int(i) for i in x.split('-')))
+    
+    def sort_key(column_header):
+        parts = column_header.split('-')
+        # Last two parts are always size and iteration
+        iteration = int(parts[-1])
+        size = int(parts[-2])
+        dataset = "-".join(parts[:-2])
+        return dataset, size, iteration
 
-    # Define the headers for the CSV file
-    fieldnames = ['COMM-EVENT'] + sorted_size_iterations
+    sorted_columns = sorted(list(all_columns), key=sort_key)
 
-    print("Writing data to CSV...")
+    # --- Filtering Step ---
+    # Find COMM-EVENTs (columns) that have a non-zero value in ALL dataset-size-iterations (rows)
+    common_comm_events = []
+    for comm_event in sorted_comm_events:
+        is_present_in_all_runs = True
+        for size_iteration in sorted_columns:
+            if aggregated_data[comm_event].get(size_iteration, 0) == 0:
+                is_present_in_all_runs = False
+                break
+        if is_present_in_all_runs:
+            common_comm_events.append(comm_event)
+
+    # Define the headers for the CSV file (transposed)
+    fieldnames = ['dataset-size-iteration'] + common_comm_events
+
+    print(f"Found {len(common_comm_events)} COMM-EVENT pairs common to all {len(sorted_columns)} runs.")
+    print("Writing transposed and filtered data to CSV...")
     try:
         with open(output_csv_path, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             
-            # This list will hold only the rows that pass the filter
-            filtered_rows = []
-
-            for event_key in sorted_comm_events:
-                row = {'COMM-EVENT': event_key}
-                is_common_to_all = True  # Assume it's common until proven otherwise
-                
-                # First, build the full row and check if it's common everywhere
-                for col_header in sorted_size_iterations:
-                    count = aggregated_data[event_key].get(col_header, 0)
-                    row[col_header] = count
-                    if count == 0:
-                        is_common_to_all = False
-                
-                if is_common_to_all:
-                    filtered_rows.append(row)
-            
-            writer.writerows(filtered_rows)
+            # Iterate through each run (dataset-size-iteration) to create a row in the CSV
+            for row_header in sorted_columns:
+                row_data = {'dataset-size-iteration': row_header}
+                for col_header in common_comm_events:
+                    # Get the count for the cell, defaulting to 0
+                    count = aggregated_data[col_header].get(row_header, 0)
+                    row_data[col_header] = count
+                writer.writerow(row_data)
         
-        print(f"Successfully created summary CSV: {output_csv_path}")
-        print(f"Total common events found: {len(filtered_rows)}")
+        print(f"Successfully created transposed summary CSV: {output_csv_path}")
 
     except IOError as e:
         print(f"Could not write to CSV file {output_csv_path}: {e}")
