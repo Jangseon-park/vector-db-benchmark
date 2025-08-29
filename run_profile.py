@@ -253,7 +253,7 @@ def test():
         "dbpedia-openai-1M-1536-angular",
     ]
     size_config = [256, 512, 768, 1024, 2048, 4096]
-    iteration_num = 3
+    iteration_num = 10
     for dataset_name in dataset_config:
         clear_all_collections()
         for engine_name in engine_config:
