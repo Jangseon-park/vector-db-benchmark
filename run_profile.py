@@ -30,6 +30,9 @@ from engine.clients.milvus.config import (
 # Use the same collection name as in the benchmark runs
 MILVUS_COLLECTION_NAME = "benchmark"
 
+# Ensure Docker Compose uses absolute volume base directory for volumes
+DOCKER_VOLUME_BASE = ""
+
 def remove_volumes(model: str, size: int):
     path = os.path.join(
         os.path.dirname(__file__), "engine", "servers", f"{model}", f"{size}"
@@ -55,13 +58,14 @@ def start_docker_containers(size: int):
     #    subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
     #    print("Volumes directory removed.")
     is_exist = False
-    volume_path = os.path.join(path, "volumes")
+    volume_base = os.environ.get("DOCKER_VOLUME_DIRECTORY", path)
+    volume_path = os.path.join(volume_base, "volumes")
     if os.path.exists(volume_path):
         is_exist = True
     try:
         # Use check=True to catch errors if docker-compose fails
         print("Starting Milvus containers...")
-        subprocess.run(["sudo", "docker", "compose", "up", "-d"], cwd=path, check=True)
+        subprocess.run(["sudo", "-E", "docker", "compose", "up", "-d"], cwd=path, check=True)
     except Exception as e:
         raise Exception(f"Failed to start containers: {e}")
 
@@ -99,7 +103,7 @@ def stop_docker_containers(size: int):
     )
     try:
         # Stop and remove containers, networks, and volumes
-        subprocess.run(["sudo", "docker", "compose", "down", "-v"], cwd=path, check=True)
+        subprocess.run(["sudo", "-E", "docker", "compose", "down", "-v"], cwd=path, check=True)
         print("Milvus containers and volumes stopped and removed.")
     except Exception as e:
         raise Exception(f"Failed to stop containers and remove volumes: {e}")
@@ -244,18 +248,30 @@ def clear_all_collections():
         for size in size_config:
             remove_volumes(engine_name, size)
 
+def set_environment(data_set_name: str):
+        # Ensure Docker Compose uses absolute volume base directory for volumes
+    DOCKER_VOLUME_BASE = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "engine",
+        "servers",
+        "milvus-single-node",
+        data_set_name,
+    )
+    os.environ["DOCKER_VOLUME_DIRECTORY"] = DOCKER_VOLUME_BASE
+    print(f"Environment set to {DOCKER_VOLUME_BASE}")
+    print(f"DOCKER_VOLUME_DIRECTORY: {os.environ['DOCKER_VOLUME_DIRECTORY']}")
 
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
         "glove-100-angular",
-        "gist-960-angular",
+        #"gist-960-angular",
         "dbpedia-openai-1M-1536-angular",
     ]
-    size_config = [256, 512, 768, 1024, 2048, 4096]
+    size_config = [256, 512, 1024, 2048, 4096]
     iteration_num = 10
     for dataset_name in dataset_config:
-        clear_all_collections()
+        set_environment(dataset_name)
         for engine_name in engine_config:
             for size in size_config:
                 for i in range(iteration_num):

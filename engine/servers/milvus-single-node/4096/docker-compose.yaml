@@ -46,10 +46,10 @@ services:
       MINIO_ADDRESS: minio:9000
       # Add new environment variables for low-resource environments
       # reduce memory limit to 4096MB
-      QUERY_NODE_MEMORY_LIMIT: 1024 # MB
+      QUERY_NODE_MEMORY_LIMIT: 512 # MB
       DATA_NODE_MEMORY_LIMIT: 1024 # MB
-      INDEX_NODE_MEMORY_LIMIT: 1024 # MB
-      ROOT_COORD_MEMORY_LIMIT: 512 # MB
+      INDEX_NODE_MEMORY_LIMIT: 512 # MB
+      ROOT_COORD_MEMORY_LIMIT: 1024 # MB
     logging:
       driver: "json-file"
       options:
