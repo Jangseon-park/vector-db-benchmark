@@ -46,7 +46,7 @@ def remove_volumes(model: str, size: int):
 
 def start_docker_containers(size: int):
     path = os.path.join(
-        os.path.dirname(__file__), "engine", "servers", f"milvus-single-node", f"{size}"
+        os.path.dirname(__file__), "engine", "servers", f"milvus-limit-ram", f"{size}"
     )
 
     # Clean up previous run's volumes before starting for a clean slate
@@ -99,7 +99,7 @@ def start_docker_containers(size: int):
 
 def stop_docker_containers(size: int):
     path = os.path.join(
-        os.path.dirname(__file__), "engine", "servers", f"milvus-single-node", f"{size}"
+        os.path.dirname(__file__), "engine", "servers", f"milvus-limit-ram", f"{size}"
     )
     try:
         # Stop and remove containers, networks, and volumes
@@ -149,7 +149,7 @@ def upload_dataset(dataset_name: str, engine_name: str):
     # flush the cache
     print("Flushing system cache...")
     subprocess.run(["sudo", "sync"], check=True)
-    subprocess.run("sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'", shell=True, check=True)
+    subprocess.run("sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'", shell=True, check=True)
     time.sleep(10)
 
     try:
@@ -196,7 +196,7 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
     # flush the cache
     print("Flushing system cache...")
     subprocess.run(["sudo", "sync"], check=True)
-    subprocess.run("sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'", shell=True, check=True)
+    subprocess.run("sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'", shell=True, check=True)
     time.sleep(10)
 
     profiler_process = None
@@ -242,7 +242,7 @@ def confirm_loaded(dataset_name: str, engine_name: str, size: int):
     print("Check-loaded command finished.")
 
 def clear_all_collections():
-    engine_config = ["milvus-single-node"]
+    engine_config = ["milvus-limit-ram"]
     size_config = [256, 512, 768, 1024, 2048, 4096]
     for engine_name in engine_config:
         for size in size_config:
@@ -254,25 +254,43 @@ def set_environment(data_set_name: str):
         os.path.dirname(os.path.abspath(__file__)),
         "engine",
         "servers",
-        "milvus-single-node",
+        "milvus-limit-ram",
         data_set_name,
     )
     os.environ["DOCKER_VOLUME_DIRECTORY"] = DOCKER_VOLUME_BASE
     print(f"Environment set to {DOCKER_VOLUME_BASE}")
     print(f"DOCKER_VOLUME_DIRECTORY: {os.environ['DOCKER_VOLUME_DIRECTORY']}")
 
+def init_docker_containers(size: int, dataset_name: str, engine_name: str):
+    is_exist = False
+    path = os.path.join(
+        os.path.dirname(__file__), "engine", "servers", f"milvus-limit-ram", f"{dataset_name}"
+    )
+    volume_base = os.environ.get("DOCKER_VOLUME_DIRECTORY", path)
+    volume_path = os.path.join(volume_base, "volumes")
+    if os.path.exists(volume_path):
+        # Use sudo to remove the directory which is owned by root (from docker)
+        subprocess.run(["sudo", "rm", "-rf", volume_path], check=True)
+        print("Volumes directory removed.")
+
+    start_docker_containers(size)
+    upload_dataset(dataset_name, engine_name)
+    confirm_loaded(dataset_name, engine_name, size)
+    stop_docker_containers(size)
+
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
         "glove-100-angular",
         #"gist-960-angular",
-        "dbpedia-openai-1M-1536-angular",
+        #"dbpedia-openai-1M-1536-angular",
     ]
-    size_config = [256, 512, 1024, 2048, 4096]
-    iteration_num = 10
+    size_config = [1700]
+    iteration_num = 1
     for dataset_name in dataset_config:
         set_environment(dataset_name)
         for engine_name in engine_config:
+            init_docker_containers(2500, dataset_name, engine_name)
             for size in size_config:
                 for i in range(iteration_num):
                     print(f"Running iteration {i} of {iteration_num} for {dataset_name} with {engine_name} and size {size}")

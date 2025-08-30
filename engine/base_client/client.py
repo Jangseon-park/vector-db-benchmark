@@ -23,7 +23,7 @@ class BaseClient:
         configurator: BaseConfigurator,
         uploader: BaseUploader,
         searchers: List[BaseSearcher],
-        drop_caches: bool = False,
+        drop_caches: bool = True,
     ):
         self.name = name
         self.engine = engine
