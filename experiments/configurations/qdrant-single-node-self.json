@@ -1,0 +1,51 @@
+[
+  {
+    "name": "qdrant-default-self",
+    "engine": "qdrant",
+    "connection_params": { "timeout": 30 },
+    "collection_params": {},
+    "search_params": [
+      { "parallel": 2, "config": { "hnsw_ef": 128 } }
+    ],
+    "upload_params": { "parallel": 1, "batch_size": 1024 }
+  },
+  {
+    "name": "qdrant-default-self-mmap",
+    "engine": "qdrant",
+    "connection_params": { "timeout": 30 },
+    "collection_params": {
+      "optimizers_config": { "memmap_threshold": 10000000 }
+    },
+    "search_params": [
+      { "parallel": 2, "config": { "hnsw_ef": 128 } }
+    ],
+    "upload_params": { "parallel": 1, "batch_size": 1024 }
+  },
+  {
+    "name": "qdrant-default-self-mmap-disk-vectors",
+    "engine": "qdrant",
+    "connection_params": { "timeout": 30 },
+    "collection_params": {
+      "optimizers_config": { "memmap_threshold": 10000000 },
+      "vectors_config": { "on_disk": true }
+    },
+    "search_params": [
+      { "parallel": 2, "config": { "hnsw_ef": 128 } }
+    ],
+    "upload_params": { "parallel": 1, "batch_size": 1024 }
+  },
+  {
+    "name": "qdrant-default-self-mmap-disk-vectors-index",
+    "engine": "qdrant",
+    "connection_params": { "timeout": 30 },
+    "collection_params": {
+      "optimizers_config": { "memmap_threshold": 10000000 },
+      "vectors_config": { "on_disk": true },
+      "hnsw_config": { "on_disk": true }
+    },
+    "search_params": [
+      { "parallel": 2, "config": { "hnsw_ef": 128 } }
+    ],
+    "upload_params": { "parallel": 1, "batch_size": 1024 }
+  }
+]

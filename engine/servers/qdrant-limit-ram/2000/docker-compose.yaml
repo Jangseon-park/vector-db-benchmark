@@ -1,0 +1,20 @@
+version: '3.7'
+
+services:
+  qdrant_bench:
+    container_name: qdrant-bench-2000
+    image: qdrant/qdrant:${QDRANT_VERSION:-v1.11.0}
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/qdrant_storage:/qdrant/storage
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 1
+        max-size: 10m
+    deploy:
+      resources:
+        limits:
+          memory: 2Gb

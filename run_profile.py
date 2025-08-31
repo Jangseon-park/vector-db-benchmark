@@ -27,7 +27,8 @@ from engine.clients.milvus.config import (
     MILVUS_DEFAULT_PORT,
 )
 
-MILVUS_MACHINE_TYPE = "milvus-limit-ram-mmap"
+MILVUS_MACHINE_TYPE = "qdrant-limit-ram"
+DOCKER_MACHINE_NAME = "qdrant-bench"
 # Use the same collection name as in the benchmark runs
 MILVUS_COLLECTION_NAME = "benchmark"
 
@@ -88,7 +89,7 @@ def start_docker_containers(size: int):
                 "ps",
                 "-a",
                 "-f",
-                "name=milvus-standalone",
+                f"name={DOCKER_MACHINE_NAME}-{size}",
                 "-f",
                 "status=running",
                 "-q",
@@ -118,7 +119,7 @@ def stop_docker_containers(size: int):
     # check if the containers are stopped
     if (
         subprocess.run(
-            ["sudo", "docker", "ps", "-a", "-f", "name=milvus-standalone", "-q"],
+            ["sudo", "docker", "ps", "-a", "-f", f"name={DOCKER_MACHINE_NAME}-{size}", "-q"],
             cwd=path,
             capture_output=True,
         ).stdout.strip()
@@ -286,13 +287,14 @@ def init_docker_containers(size: int, dataset_name: str, engine_name: str):
     stop_docker_containers(size)
 
 def test():
-    engine_config = ["milvus-default-self"]
+    engine_config = ["qdrant-default-self"]
+    #, "qdrant-default-self-mmap", "qdrant-default-self-mmap-disk-vectors", "qdrant-default-self-mmap-disk-vectors-index"]
     dataset_config = [
         "glove-100-angular",
         #"gist-960-angular",
         #"dbpedia-openai-1M-1536-angular",
     ]
-    size_config = [1600, 1500, 1400, 1300, 1200, 1100, 1000]
+    size_config = [1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
     iteration_num = 1
     for dataset_name in dataset_config:
         set_environment(dataset_name)

@@ -13,7 +13,7 @@ def normalize_comm_name(comm):
         return "milvus"
     if re.match(r"^MILVUS_CPU_\d+$", comm):
         return "milvus"
-    
+
     # Remove numeric suffix like -1, -2 etc.
     return re.sub(r'-\d+$', '', comm)
 
@@ -46,10 +46,10 @@ def parse_log_file(file_path):
 def main():
     """
     Walks through the profile_results directory, aggregates data from all
-    log files, and writes a summary CSV.
+    log files, and writes a summary CSV including all COMM-EVENT pairs.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_csv_path = os.path.join(script_dir, "summary_transposed.csv")
+    output_csv_path = os.path.join(script_dir, "summary_full_transposed.csv")
 
     # This will store the data in a nested dictionary format:
     # { 'comm-event': { 'dataset-size-iteration': count, ... }, ... }
@@ -63,8 +63,8 @@ def main():
 
     # Walk through subdirectories to find all log files
     for root, _, files in os.walk(script_dir):
-        # Skip the 'histograms' directory and the root directory itself
-        if "histograms" in root or os.path.samefile(root, script_dir):
+        # Skip certain directories and the root directory itself
+        if "histograms" in root or "analysis_plots" in root or os.path.samefile(root, script_dir):
             continue
         
         for file in files:
@@ -122,23 +122,11 @@ def main():
 
     sorted_columns = sorted(list(all_columns), key=sort_key)
 
-    # --- Filtering Step ---
-    # Find COMM-EVENTs (columns) that have a non-zero value in ALL dataset-size-iterations (rows)
-    common_comm_events = []
-    for comm_event in sorted_comm_events:
-        is_present_in_all_runs = True
-        for size_iteration in sorted_columns:
-            if aggregated_data[comm_event].get(size_iteration, 0) == 0:
-                is_present_in_all_runs = False
-                break
-        if is_present_in_all_runs:
-            common_comm_events.append(comm_event)
-
     # Define the headers for the CSV file (transposed)
-    fieldnames = ['dataset-size-iteration'] + common_comm_events
+    fieldnames = ['dataset-size-iteration'] + sorted_comm_events
 
-    print(f"Found {len(common_comm_events)} COMM-EVENT pairs common to all {len(sorted_columns)} runs.")
-    print("Writing transposed and filtered data to CSV...")
+    print(f"Found {len(sorted_comm_events)} total COMM-EVENT pairs across all {len(sorted_columns)} runs.")
+    print("Writing transposed and unfiltered data to CSV...")
     try:
         with open(output_csv_path, 'w', newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -147,13 +135,13 @@ def main():
             # Iterate through each run (dataset-size-iteration) to create a row in the CSV
             for row_header in sorted_columns:
                 row_data = {'dataset-size-iteration': row_header}
-                for col_header in common_comm_events:
+                for col_header in sorted_comm_events:
                     # Get the count for the cell, defaulting to 0
                     count = aggregated_data[col_header].get(row_header, 0)
                     row_data[col_header] = count
                 writer.writerow(row_data)
         
-        print(f"Successfully created transposed summary CSV: {output_csv_path}")
+        print(f"Successfully created full transposed summary CSV: {output_csv_path}")
 
     except IOError as e:
         print(f"Could not write to CSV file {output_csv_path}: {e}")
