@@ -44,6 +44,7 @@ services:
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
+      MILVUS_CONF_FILE: /milvus/configs/milvus.yaml
     logging:
       driver: "json-file"
       options:
@@ -51,13 +52,22 @@ services:
         max-size: 10m
     ports:
       - "19530:19530"
+      - "8080:8080"
+    volumes:
+      - ./milvus.yaml:/milvus/configs/milvus.yaml:ro
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus   
     depends_on:
       - "etcd"
       - "minio"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v2/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     deploy:
       resources:
         limits:
-          memory: 1.55Gb 
+          memory: 1.6Gb 
 
 networks:
   default:

@@ -3,6 +3,17 @@ import re
 import csv
 from collections import Counter, defaultdict
 
+def normalize_comm_name(comm):
+    """
+    Normalize COMM names so that 'milvus' and 'MILVUS_CPU_{Number}'
+    are consolidated under 'milvus'.
+    """
+    if comm == "milvus":
+        return "milvus"
+    if re.match(r"^MILVUS_CPU_\d+$", comm):
+        return "milvus"
+    return comm
+
 def parse_log_file(file_path):
     """
     Parses a single log file and returns a Counter of COMM-EVENT pairs.
@@ -21,7 +32,8 @@ def parse_log_file(file_path):
                 match = line_regex.match(line.strip())
                 if match:
                     comm, _, event = match.groups()
-                    event_key = f"{comm}-{event.strip()}"
+                    normalized_comm = normalize_comm_name(comm)
+                    event_key = f"{normalized_comm}-{event.strip()}"
                     event_counter[event_key] += 1
     except Exception as e:
         print(f"Error processing file {file_path}: {e}")

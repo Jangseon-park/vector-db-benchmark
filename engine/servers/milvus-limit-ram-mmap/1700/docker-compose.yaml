@@ -1,5 +1,3 @@
-version: '3.5'
-
 services:
   etcd:
     container_name: milvus-etcd
@@ -15,7 +13,7 @@ services:
       options:
         max-file: 1
         max-size: 10m
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
 
   minio:
     container_name: milvus-minio
@@ -38,12 +36,13 @@ services:
       retries: 3
 
   standalone:
-    container_name: milvus-standalone
-    image: milvusdb/milvus:v2.6.0
+    container_name: milvus-standalone-1700
+    image: milvusdb/milvus:v2.4.1
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
+      MILVUS_CONF_FILE: /milvus/configs/milvus.yaml
     logging:
       driver: "json-file"
       options:
@@ -51,13 +50,16 @@ services:
         max-size: 10m
     ports:
       - "19530:19530"
+    volumes:
+      - ./milvus.yaml:/milvus/configs/milvus.yaml:ro
+      - /home/wolf/workspace/vector-db-benchmark/engine/servers/milvus-limit-ram-mmap/1700/volumes/milvus:/var/lib/milvus
     depends_on:
       - "etcd"
       - "minio"
     deploy:
       resources:
         limits:
-          memory: 1.8Gb 
+          memory: 1.7Gb 
 
 networks:
   default:
