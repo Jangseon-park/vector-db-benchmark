@@ -3,9 +3,11 @@
     "name": "qdrant-default-self",
     "engine": "qdrant",
     "connection_params": { "timeout": 30 },
-    "collection_params": {},
+    "collection_params": {
+      "hnsw_config": { "m": 64, "ef_construct": 128 }
+    },
     "search_params": [
-      { "parallel": 2, "config": { "hnsw_ef": 128 } }
+      { "parallel": 2, "config": {"hnsw_ef": 128 } }
     ],
     "upload_params": { "parallel": 1, "batch_size": 1024 }
   },

@@ -37,7 +37,7 @@ def plot_size_trends(df, output_dir):
         plt.style.use('seaborn-v0_8-whitegrid')
         fig, ax = plt.subplots(figsize=(15, 8))
         
-        target_comms = ['milvus', 'knowhere_search', 'search', 'general']
+        target_comms = ['qdrant', 'search', 'general']
         target_events = ['Disk IO', 'Major Fault']
 
         for column in dataset_data.columns:
@@ -81,7 +81,7 @@ def plot_io_fault_correlation(df, output_dir):
 
     unique_comms = set(col.split('-')[0] for col in columns)
 
-    target_comms = ['milvus', 'knowhere_search', 'search', 'general']
+    target_comms = ['qdrant', 'search', 'general']
     # Filter unique_comms to only include ones that start with our targets
     unique_comms = {comm for comm in unique_comms if any(comm.lower().startswith(tc.lower()) for tc in target_comms)}
 
@@ -142,7 +142,7 @@ def plot_major_fault_contribution(df, output_dir):
     # Filter for columns that are Major Fault events
     fault_columns = [col for col in df.columns if 'Major Fault' in col]
 
-    target_comms = ['milvus', 'knowhere_search', 'search', 'general']
+    target_comms = ['qdrant', 'search', 'general']
     # Further filter to include only target comms
     fault_columns = [
         col for col in fault_columns
@@ -190,7 +190,7 @@ def main():
     Main function to load data and generate plots.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(script_dir, "summary_transposed.csv")
+    csv_path = os.path.join(script_dir, "summary_full_transposed.csv")
     output_dir = os.path.join(script_dir, "analysis_plots")
 
     if not os.path.exists(csv_path):

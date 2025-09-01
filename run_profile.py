@@ -294,8 +294,8 @@ def test():
         #"gist-960-angular",
         #"dbpedia-openai-1M-1536-angular",
     ]
-    size_config = [1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
-    iteration_num = 1
+    size_config = [1500, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200]
+    iteration_num = 10
     for dataset_name in dataset_config:
         set_environment(dataset_name)
         for engine_name in engine_config:
