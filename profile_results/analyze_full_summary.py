@@ -53,19 +53,24 @@ def plot_aggregated_events_by_size(df, output_dir):
         x = np.arange(len(dataset_data['size']))
         width = 0.35
 
-        rects1 = ax.bar(x - width/2, dataset_data['Total Major Faults'], width, label='Total Major Faults', color='indianred')
-        rects2 = ax.bar(x + width/2, dataset_data['Total Disk IO'], width, label='Total Disk IO', color='steelblue')
+        # Scale data for better readability on the plot
+        scale_factor = 1_000_000.0
+        faults_scaled = dataset_data['Total Major Faults'] / scale_factor
+        io_scaled = dataset_data['Total Disk IO'] / scale_factor
+
+        rects1 = ax.bar(x - width/2, faults_scaled, width, label='Total Major Faults', color='indianred')
+        rects2 = ax.bar(x + width/2, io_scaled, width, label='Total Disk IO', color='steelblue')
 
         # Add some text for labels, title and axes ticks
-        ax.set_ylabel('Total Event Count (Sum over all iterations)')
+        ax.set_ylabel('Total Event Count (in Millions, sum over all iterations)')
         ax.set_title(f'Total Major Faults and Disk IO vs. Memory Size for\n{dataset}')
         ax.set_xticks(x)
         ax.set_xticklabels(dataset_data['size'])
         ax.set_xlabel('Memory Size (config)')
         ax.legend()
 
-        ax.bar_label(rects1, padding=3, fmt='%d')
-        ax.bar_label(rects2, padding=3, fmt='%d')
+        ax.bar_label(rects1, padding=3, fmt='%.0f')
+        ax.bar_label(rects2, padding=3, fmt='%.0f')
 
         fig.tight_layout()
 

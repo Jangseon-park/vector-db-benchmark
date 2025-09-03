@@ -287,15 +287,15 @@ def init_docker_containers(size: int, dataset_name: str, engine_name: str):
     stop_docker_containers(size)
 
 def test():
-    engine_config = ["qdrant-default-self"]
+    engine_config = ["qdrant-default-self-mmap-disk-vectors-index"]
     #, "qdrant-default-self-mmap", "qdrant-default-self-mmap-disk-vectors", "qdrant-default-self-mmap-disk-vectors-index"]
     dataset_config = [
         "glove-100-angular",
         #"gist-960-angular",
         #"dbpedia-openai-1M-1536-angular",
     ]
-    size_config = [1500, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200]
-    iteration_num = 10
+    size_config = [5000, 4600, 4200, 3900, 3600, 3300, 3000, 2800, 2600, 2400, 2200, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]
+    iteration_num = 2
     for dataset_name in dataset_config:
         set_environment(dataset_name)
         for engine_name in engine_config:

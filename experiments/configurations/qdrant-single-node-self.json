@@ -43,7 +43,7 @@
     "collection_params": {
       "optimizers_config": { "memmap_threshold": 10000000 },
       "vectors_config": { "on_disk": true },
-      "hnsw_config": { "on_disk": true }
+      "hnsw_config": {"m": 16, "on_disk": true }
     },
     "search_params": [
       { "parallel": 2, "config": { "hnsw_ef": 128 } }
