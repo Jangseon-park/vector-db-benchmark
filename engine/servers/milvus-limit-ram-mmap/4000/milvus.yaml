@@ -17,7 +17,7 @@
 # Related configuration of etcd, used to store Milvus metadata.
 etcd:
   endpoints:
-    - localhost:2379
+    - etcd:2379
   rootPath: by-dev # The root path where data is stored in etcd
   metaSubPath: meta # metaRootPath = rootPath + '/' + metaSubPath
   kvSubPath: kv # kvRootPath = rootPath + '/' + kvSubPath
@@ -28,7 +28,7 @@ etcd:
 
 # Related configuration of minio, which is responsible for data persistence for Milvus.
 minio:
-  address: localhost # Address of MinIO/S3
+  address: minio # Address of MinIO/S3
   port: 9000   # Port of MinIO/S3
   accessKeyID: minioadmin # accessKeyID of MinIO/S3
   secretAccessKey: minioadmin # MinIO/S3 encryption string
@@ -110,7 +110,7 @@ queryCoord:
 
 # Related configuration of queryNode, used to run hybrid search between vector and scalar data.
 queryNode:
-  cacheSize: 32 # GB, default 32 GB, `cacheSize` is the memory used for caching data for faster query. The `cacheSize` must be less than system memory size.
+  cacheSize: 1 # GB, default 32 GB, `cacheSize` is the memory used for caching data for faster query. The `cacheSize` must be less than system memory size.
   gracefulTime: 0 # Minimum time before the newly inserted data can be searched (in ms)
   port: 21123
 
@@ -141,6 +141,7 @@ queryNode:
     vectorIndex: true # Enable mmap for loading vector index
     scalarField: true # Enable mmap for loading scalar data
     scalarIndex: false # Enable mmap for loading scalar index
+    mmapDirPath: /var/lib/milvus/data/mmap
 
 indexCoord:
   address: localhost
