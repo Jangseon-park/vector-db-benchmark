@@ -288,11 +288,13 @@ def init_docker_containers(size: int, dataset_name: str, engine_name: str):
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
-        "glove-100-angular",
+        #"glove-25-angular",
         #"gist-960-angular",
-        #"dbpedia-openai-1M-1536-angular",
+        "dbpedia-openai-1M-1536-angular",
     ]
-    size_config = [5000, 4000, 3000, 2000, 1800, 1600, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]
+    #size_config = [5000, 4000, 3000, 2000, 1800, 1600, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]
+    size_config = [4600, 4200, 4000, 3800, 3600, 3400, 3200, 3000, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000]
+    #size_config = [9000, 8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000]
     iteration_num = 1
     for dataset_name in dataset_config:
         set_environment(dataset_name)
