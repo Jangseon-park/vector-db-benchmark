@@ -72,6 +72,7 @@ class MilvusUploader(BaseUploader):
             "index_type": cls.upload_params["index_type"],
             "params": {**cls.upload_params.get("index_params", {})},
         }
+        print(f"Creating index with parameters: {index_params}")
         cls.collection.flush()
         cls.collection.create_index(field_name="vector", index_params=index_params)
         print(f"Creating index with parameters: {index_params}")

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "milvus-default-self",
+    "engine": "milvus",
+    "connection_params": {},
+    "collection_params": {},
+    "search_params": [{ "parallel": 1, "config": { "ef": 128 } }],
+    "upload_params": { "parallel": 8, "index_params": { "efConstruction": 100, "M": 64}, "index_type": "HNSW" }
+  }
+]
