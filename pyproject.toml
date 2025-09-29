@@ -7,6 +7,8 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"
+# We are installing a patched version of numpy from a local path in install.sh
+numpy = {path = "/home/gem5/numpy-patched", develop = false}
 qdrant-client = { git = "https://github.com/qdrant/qdrant-client.git", branch = "dev" }
 typer = "^0.6.1"
 jsons = "^1.6.3"
