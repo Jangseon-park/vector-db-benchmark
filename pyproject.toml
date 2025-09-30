@@ -17,7 +17,6 @@ pymilvus = "^2.4.1"
 redis = "^5.0.1"
 elasticsearch = "^8.11.0"
 psycopg = {version = "^3.1.12", extras = ["binary"]}
-numpy = "^1.26.2"
 h5py = "^3.10.0"
 stopit = "^1.1.2"
 prometheus-client = "^0.19.0"
@@ -25,6 +24,7 @@ pandas = "^2.1.4"
 ujson = "^5.9.0"
 python-ulid = "^2.0.0"
 click = "8.1.7"
+tqdm = "^4.67.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^2.20.0"
