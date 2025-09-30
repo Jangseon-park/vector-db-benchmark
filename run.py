@@ -17,26 +17,30 @@ app = typer.Typer()
 
 @app.command()
 def run(
-    engines: List[str] = typer.Option(["*"]),
-    datasets: List[str] = typer.Option(["*"]),
+    engines: List[str] = typer.Option(["*"], "--engines", help="Engine config name patterns (fnmatch)"),
+    datasets: List[str] = typer.Option(["*"], "--datasets", help="Dataset name patterns (fnmatch)"),
     host: str = "localhost",
     skip_upload: bool = typer.Option(
-        False, "--skip-upload/--no-skip-upload", help="Skip the upload step"
+        False, "--skip-upload", is_flag=True, help="Skip the upload step"
     ),
     skip_search: bool = typer.Option(
-        False, "--skip-search/--no-skip-search", help="Skip the search step"
+        False, "--skip-search", is_flag=True, help="Skip the search step"
     ),
-    skip_if_exists: bool = False,
-    exit_on_error: bool = True,
+    skip_if_exists: bool = typer.Option(
+        False, "--skip-if-exists", is_flag=True, help="Skip run if target already exists"
+    ),
+    exit_on_error: bool = typer.Option(
+        True, "--exit-on-error", is_flag=True, help="Exit immediately on first error"
+    ),
     timeout: float = 86400.0,
     skip_configure: bool = typer.Option(
-        False, "--skip-configure/--no-skip-configure", help="Skip engine configuration"
+        False, "--skip-configure", is_flag=True, help="Skip engine configuration"
     ),
     check_loaded: bool = typer.Option(
-        False, "--check-loaded", help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)"
+        False, "--check-loaded", is_flag=True, help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)"
     ),
     drop_caches: bool = typer.Option(
-        False, "--drop-caches/--no-drop-caches", help="Drop caches before search"
+        False, "--drop-caches", is_flag=True, help="Drop caches before search"
     ),
 ):
     """

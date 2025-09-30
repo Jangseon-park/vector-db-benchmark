@@ -149,7 +149,6 @@ def upload_dataset(dataset_name: str, engine_name: str):
         engine_name,
         "--datasets",
         dataset_name,
-        "--no-skip-upload",
         "--skip-search",
         "--drop-caches",
     ]
@@ -197,7 +196,7 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
         "--datasets",
         dataset_name,
         "--skip-upload",
-        "--no-skip-search",
+        #"--no-skip-search",
         "--drop-caches",
     ]
     # flush the cache
