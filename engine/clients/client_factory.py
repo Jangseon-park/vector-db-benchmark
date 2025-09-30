@@ -7,59 +7,46 @@ from engine.base_client.client import (
     BaseSearcher,
     BaseUploader,
 )
-from engine.clients.elasticsearch import (
-    ElasticConfigurator,
-    ElasticSearcher,
-    ElasticUploader,
-)
-from engine.clients.milvus import MilvusConfigurator, MilvusSearcher, MilvusUploader
-from engine.clients.opensearch import (
-    OpenSearchConfigurator,
-    OpenSearchSearcher,
-    OpenSearchUploader,
-)
-from engine.clients.pgvector import (
-    PgVectorConfigurator,
-    PgVectorSearcher,
-    PgVectorUploader,
-)
-from engine.clients.qdrant import QdrantConfigurator, QdrantSearcher, QdrantUploader
-from engine.clients.redis import RedisConfigurator, RedisSearcher, RedisUploader
-from engine.clients.weaviate import (
-    WeaviateConfigurator,
-    WeaviateSearcher,
-    WeaviateUploader,
-)
 
 ENGINE_CONFIGURATORS = {
-    "qdrant": QdrantConfigurator,
-    "weaviate": WeaviateConfigurator,
-    "milvus": MilvusConfigurator,
-    "elasticsearch": ElasticConfigurator,
-    "opensearch": OpenSearchConfigurator,
-    "redis": RedisConfigurator,
-    "pgvector": PgVectorConfigurator,
+    "qdrant": "engine.clients.qdrant.QdrantConfigurator",
+    "weaviate": "engine.clients.weaviate.WeaviateConfigurator",
+    "milvus": "engine.clients.milvus.MilvusConfigurator",
+    "elasticsearch": "engine.clients.elasticsearch.ElasticConfigurator",
+    "opensearch": "engine.clients.opensearch.OpenSearchConfigurator",
+    "redis": "engine.clients.redis.RedisConfigurator",
+    "pgvector": "engine.clients.pgvector.PgVectorConfigurator",
 }
 
 ENGINE_UPLOADERS = {
-    "qdrant": QdrantUploader,
-    "weaviate": WeaviateUploader,
-    "milvus": MilvusUploader,
-    "elasticsearch": ElasticUploader,
-    "opensearch": OpenSearchUploader,
-    "redis": RedisUploader,
-    "pgvector": PgVectorUploader,
+    "qdrant": "engine.clients.qdrant.QdrantUploader",
+    "weaviate": "engine.clients.weaviate.WeaviateUploader",
+    "milvus": "engine.clients.milvus.MilvusUploader",
+    "elasticsearch": "engine.clients.elasticsearch.ElasticUploader",
+    "opensearch": "engine.clients.opensearch.OpenSearchUploader",
+    "redis": "engine.clients.redis.RedisUploader",
+    "pgvector": "engine.clients.pgvector.PgVectorUploader",
 }
 
 ENGINE_SEARCHERS = {
-    "qdrant": QdrantSearcher,
-    "weaviate": WeaviateSearcher,
-    "milvus": MilvusSearcher,
-    "elasticsearch": ElasticSearcher,
-    "opensearch": OpenSearchSearcher,
-    "redis": RedisSearcher,
-    "pgvector": PgVectorSearcher,
+    "qdrant": "engine.clients.qdrant.QdrantSearcher",
+    "weaviate": "engine.clients.weaviate.WeaviateSearcher",
+    "milvus": "engine.clients.milvus.MilvusSearcher",
+    "elasticsearch": "engine.clients.elasticsearch.ElasticSearcher",
+    "opensearch": "engine.clients.opensearch.OpenSearchSearcher",
+    "redis": "engine.clients.redis.RedisSearcher",
+    "pgvector": "engine.clients.pgvector.PgVectorSearcher",
 }
+
+
+def _get_class(class_path: str):
+    module_name, class_name = class_path.rsplit(".", 1)
+    # The importlib.import_module function is used to dynamically import a module.
+    # It takes the module name as a string and returns the module object.
+    # The getattr function is then used to get the class from the module.
+    import importlib
+    module = importlib.import_module(module_name)
+    return getattr(module, class_name)
 
 
 class ClientFactory(ABC):
@@ -69,7 +56,7 @@ class ClientFactory(ABC):
 
     def _create_configurator(self, experiment) -> BaseConfigurator:
         self.engine = experiment["engine"]
-        engine_configurator_class = ENGINE_CONFIGURATORS[experiment["engine"]]
+        engine_configurator_class = _get_class(ENGINE_CONFIGURATORS[experiment["engine"]])
         engine_configurator = engine_configurator_class(
             self.host,
             collection_params={**experiment.get("collection_params", {})},
@@ -78,7 +65,7 @@ class ClientFactory(ABC):
         return engine_configurator
 
     def _create_uploader(self, experiment) -> BaseUploader:
-        engine_uploader_class = ENGINE_UPLOADERS[experiment["engine"]]
+        engine_uploader_class = _get_class(ENGINE_UPLOADERS[experiment["engine"]])
         engine_uploader = engine_uploader_class(
             self.host,
             connection_params={**experiment.get("connection_params", {})},
@@ -87,9 +74,9 @@ class ClientFactory(ABC):
         return engine_uploader
 
     def _create_searchers(self, experiment) -> List[BaseSearcher]:
-        engine_searcher_class: Type[BaseSearcher] = ENGINE_SEARCHERS[
+        engine_searcher_class: Type[BaseSearcher] = _get_class(ENGINE_SEARCHERS[
             experiment["engine"]
-        ]
+        ])
 
         engine_searchers = [
             engine_searcher_class(
