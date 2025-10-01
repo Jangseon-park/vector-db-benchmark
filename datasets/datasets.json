@@ -3,8 +3,8 @@
     "name": "glove-25-angular",
     "vector_size": 25,
     "distance": "cosine",
-    "type": "h5",
-    "path": "glove-25-angular/glove-25-angular.hdf5",
+    "type": "npz",
+    "path": "glove-25-angular/glove-25-angular.npz",
     "link": "http://ann-benchmarks.com/glove-25-angular.hdf5"
   },
   {

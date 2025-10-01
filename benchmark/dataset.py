@@ -8,7 +8,7 @@ from urllib.request import build_opener, install_opener
 
 from benchmark import DATASETS_DIR
 from dataset_reader.ann_compound_reader import AnnCompoundReader
-from dataset_reader.ann_h5_reader import AnnH5Reader
+from dataset_reader.npz_reader import NpzReader
 from dataset_reader.base_reader import BaseReader
 from dataset_reader.json_reader import JSONReader
 from dataset_reader.sparse_reader import SparseReader
@@ -34,7 +34,7 @@ class DatasetConfig:
 
 
 READER_TYPE = {
-    "h5": AnnH5Reader,
+    "npz": NpzReader,
     "jsonl": JSONReader,
     "tar": AnnCompoundReader,
     "sparse": SparseReader,
@@ -82,8 +82,8 @@ if __name__ == "__main__":
             "name": "glove-25-angular",
             "vector_size": 25,
             "distance": "Cosine",
-            "type": "h5",
-            "path": "glove-25-angular/glove-25-angular.hdf5",
+            "type": "npz",
+            "path": "glove-25-angular/glove-25-angular.npz",
             "link": "http://ann-benchmarks.com/glove-25-angular.hdf5",
         }
     )
