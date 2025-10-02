@@ -1,6 +1,6 @@
 [
   {
-    "name": "milvus-default-self",
+    "name": "milvus-default-self-node",
     "engine": "milvus",
     "connection_params": {},
     "collection_params": {},
