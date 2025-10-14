@@ -1,6 +1,6 @@
 import fnmatch
 import traceback
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import stopit
 import typer
@@ -20,24 +20,16 @@ def run(
     engines: List[str] = typer.Option(["*"]),
     datasets: List[str] = typer.Option(["*"]),
     host: str = "localhost",
-    skip_upload: bool = typer.Option(
-        False, "--skip-upload/--no-skip-upload", help="Skip the upload step"
-    ),
-    skip_search: bool = typer.Option(
-        False, "--skip-search/--no-skip-search", help="Skip the search step"
-    ),
+    skip_upload: bool = Annotated[bool, typer.Option(
+        False, help="Skip the upload step"
+    )],
+    skip_search: bool = Annotated[bool, typer.Option(False, help="Skip the search step")],
     skip_if_exists: bool = False,
     exit_on_error: bool = True,
     timeout: float = 86400.0,
-    skip_configure: bool = typer.Option(
-        False, "--skip-configure/--no-skip-configure", help="Skip engine configuration"
-    ),
-    check_loaded: bool = typer.Option(
-        False, "--check-loaded", help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)"
-    ),
-    drop_caches: bool = typer.Option(
-        False, "--drop-caches/--no-drop-caches", help="Drop caches before search"
-    ),
+    skip_configure: bool = Annotated[bool, typer.Option(False, help="Skip engine configuration")],
+    check_loaded: bool = Annotated[bool, typer.Option(False, help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)")],
+    drop_caches: bool = Annotated[bool, typer.Option(False, help="Drop caches before search")],
 ):
     """
     Examples:

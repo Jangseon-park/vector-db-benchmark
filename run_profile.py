@@ -50,6 +50,10 @@ def start_docker_containers(size: int):
         os.path.dirname(__file__), "engine", "servers", f"{MILVUS_MACHINE_TYPE}", f"{size}"
     )
 
+    print("Running docker compose down to ensure a clean state...")
+    # Don't check for errors, as this command can fail if there are no containers to stop
+    subprocess.run(["sudo", "-E", "docker", "compose", "down", "-v"], cwd=path)
+
     # Clean up previous run's volumes before starting for a clean slate
     #
     #volume_path = os.path.join(path, "volumes")
@@ -78,6 +82,9 @@ def start_docker_containers(size: int):
 
     # Wait for a moment to ensure the service is responsive
     time.sleep(5)
+
+    print("Checking container status after start:")
+    subprocess.run(["sudo", "-E", "docker", "compose", "ps"], cwd=path)
 
     # check if the containers are running
     if (
@@ -108,6 +115,8 @@ def stop_docker_containers(size: int):
     path = os.path.join(
         os.path.dirname(__file__), "engine", "servers", f"{MILVUS_MACHINE_TYPE}", f"{size}"
     )
+    print("Checking container status before stopping:")
+    subprocess.run(["sudo", "-E", "docker", "compose", "ps"], cwd=path)
     try:
         # Stop and remove containers, networks, and volumes
         subprocess.run(["sudo", "-E", "docker", "compose", "down", "-v"], cwd=path, check=True)
@@ -149,7 +158,6 @@ def upload_dataset(dataset_name: str, engine_name: str):
         engine_name,
         "--datasets",
         dataset_name,
-        "--no-skip-upload",
         "--skip-search",
         "--drop-caches",
     ]
@@ -197,7 +205,6 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
         "--datasets",
         dataset_name,
         "--skip-upload",
-        "--no-skip-search",
         "--drop-caches",
     ]
     # flush the cache
