@@ -82,7 +82,7 @@ class BaseSearcher:
             results = []
             for i, query in enumerate(tqdm.tqdm(queries)):
                 if not switched and i == switch_point:
-                    print("---- GEM5 SWITCH POINT ----")
+                    os.system('echo "---- GEM5 SWITCH POINT ----"')
                     switched = True
                 results.append(search_one(query))
             precisions, latencies = list(zip(*results))
