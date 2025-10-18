@@ -2,6 +2,7 @@ import functools
 import time
 from multiprocessing import get_context
 from typing import Iterable, List, Optional, Tuple
+import os
 
 import numpy as np
 import tqdm
@@ -70,10 +71,21 @@ class BaseSearcher:
         search_one = functools.partial(self.__class__._search_one, top=top)
 
         if parallel == 1:
+            queries = list(queries)
+            total_queries = len(queries)
+            switch_point = total_queries // 3  # 30% is roughly 1/3
+            switched = False
+
             start = time.perf_counter()
-            precisions, latencies = list(
-                zip(*[search_one(query) for query in tqdm.tqdm(queries)])
-            )
+            # A list comprehension is not used here to make the switch point logic more readable
+            # and to ensure the `switched` flag is correctly updated.
+            results = []
+            for i, query in enumerate(tqdm.tqdm(queries)):
+                if not switched and i == switch_point:
+                    print("---- GEM5 SWITCH POINT ----")
+                    switched = True
+                results.append(search_one(query))
+            precisions, latencies = list(zip(*results))
         else:
             ctx = get_context(self.get_mp_start_method())
 
