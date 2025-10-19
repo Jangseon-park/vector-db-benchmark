@@ -39,6 +39,10 @@ services:
     container_name: milvus-standalone-10000
     image: milvusdb/milvus:v2.4.1
     command: ["milvus", "run", "standalone"]
+    ulimits:
+      core:
+        soft: -1
+        hard: -1
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
