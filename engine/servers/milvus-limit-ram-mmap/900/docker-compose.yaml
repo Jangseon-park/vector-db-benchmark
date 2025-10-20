@@ -41,7 +41,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 0.8Gb 
+          memory: 0.5Gb 
 
   standalone:
     container_name: milvus-standalone-900
