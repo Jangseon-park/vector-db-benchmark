@@ -14,6 +14,10 @@ services:
         max-file: 1
         max-size: 10m
     command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    deploy:
+      resources:
+        limits:
+          memory: 0.5Gb 
 
   minio:
     container_name: milvus-minio
@@ -34,6 +38,10 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 0.8Gb 
 
   standalone:
     container_name: milvus-standalone-900
