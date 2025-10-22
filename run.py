@@ -17,19 +17,39 @@ app = typer.Typer()
 
 @app.command()
 def run(
-    engines: List[str] = typer.Option(["*"]),
-    datasets: List[str] = typer.Option(["*"]),
-    host: str = "localhost",
-    skip_upload: bool = Annotated[bool, typer.Option(
-        False, help="Skip the upload step"
-    )],
-    skip_search: bool = Annotated[bool, typer.Option(False, help="Skip the search step")],
-    skip_if_exists: bool = False,
-    exit_on_error: bool = True,
-    timeout: float = 86400.0,
-    skip_configure: bool = Annotated[bool, typer.Option(False, help="Skip engine configuration")],
-    check_loaded: bool = Annotated[bool, typer.Option(False, help="Initialize client(s), wait for collections to be loaded and exit (no upload/search)")],
-    drop_caches: bool = Annotated[bool, typer.Option(False, help="Drop caches before search")],
+    engines: Annotated[
+        List[str], typer.Option(help="Engines to run")
+    ] = ["*"],
+    datasets: Annotated[
+        List[str], typer.Option(help="Datasets to run")
+    ] = ["*"],
+    host: Annotated[
+        str, typer.Option(help="Host of the vector database")
+    ] = "localhost",
+    skip_upload: Annotated[
+        bool, typer.Option(help="Skip the upload step")
+    ] = False,
+    skip_search: Annotated[
+        bool, typer.Option(help="Skip the search step")
+    ] = False,
+    skip_if_exists: Annotated[
+        bool, typer.Option(help="Skip running an experiment if the result file already exists")
+    ] = False,
+    exit_on_error: Annotated[
+        bool, typer.Option(help="Exit if an experiment fails")
+    ] = True,
+    timeout: Annotated[
+        float, typer.Option(help="Timeout for each experiment")
+    ] = 86400.0,
+    skip_configure: Annotated[
+        bool, typer.Option(help="Skip engine configuration")
+    ] = False,
+    check_loaded: Annotated[
+        bool, typer.Option(help="Initialize client(s), wait for collections to be loaded and exit")
+    ] = False,
+    drop_caches: Annotated[
+        bool, typer.Option(help="Drop caches before search")
+    ] = False,
 ):
     """
     Examples:

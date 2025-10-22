@@ -179,6 +179,38 @@ def upload_dataset(dataset_name: str, engine_name: str):
     return path
 
 
+def get_milvus_pid():
+    """Gets the host PID of the milvus-standalone docker container."""
+    try:
+        # First, get the container ID using the provided command logic
+        container_id_cmd = ["sudo", "docker", "ps", "-q", "-f", "name=milvus-standalone"]
+        container_id_raw = subprocess.check_output(container_id_cmd).strip()
+
+        if not container_id_raw:
+            raise RuntimeError("Could not find a running milvus-standalone container.")
+        
+        # The command might return multiple IDs if there are multiple matches, take the first one.
+        container_id = container_id_raw.decode('utf-8').splitlines()[0]
+
+        # Use the container ID to inspect the container and get the host PID
+        pid_cmd = ["sudo", "docker", "inspect", "-f", "{{.State.Pid}}", container_id]
+        pid_raw = subprocess.check_output(pid_cmd).strip()
+        pid = pid_raw.decode('utf-8')
+        
+        # Ensure it's a valid integer before returning
+        int(pid)
+        return pid
+
+    except subprocess.CalledProcessError as e:
+        # Provide more context on why the command failed
+        error_output = e.stderr.decode('utf-8').strip() if e.stderr else "No stderr output"
+        raise RuntimeError(f"Failed to get Milvus PID. Command '{' '.join(e.cmd)}' failed with: {error_output}")
+    except (ValueError, IndexError) as e:
+        raise RuntimeError(f"Could not parse PID from docker command output: {e}")
+    except Exception as e:
+        raise RuntimeError(f"An unexpected error occurred while getting Milvus PID: {e}")
+
+
 def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: int):
     path = os.path.dirname(__file__)
     # Use sys.executable to ensure we are using the same python interpreter
@@ -187,14 +219,23 @@ def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: i
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
 
+    try:
+        milvus_pid = get_milvus_pid()
+        print(f"Successfully retrieved Milvus PID: {milvus_pid}")
+    except RuntimeError as e:
+        print(f"Error: Could not get Milvus PID. Profiling will be skipped. Reason: {e}", file=sys.stderr)
+        return
+
     python_executable = sys.executable
     profile_cmd = [
         "sudo",
         "-E",
         "python3",
-        "trace_system_fault.py",
+        "trace_memory_access.py",
         "--output",
         f"{output_path}",
+        "--pid",
+        milvus_pid,
     ]
 
     cmd = [
@@ -295,9 +336,9 @@ def init_docker_containers(size: int, dataset_name: str, engine_name: str):
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
-        #"glove-25-angular",
+        "glove-25-angular",
         #"gist-960-angular",
-        "dbpedia-openai-1M-1536-angular",
+        #"dbpedia-openai-1M-1536-angular",
     ]
     #size_config = [5000, 4000, 3000, 2000, 1800, 1600, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]
     size_config = [4600, 4200, 4000, 3800, 3600, 3400, 3200, 3000, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000]
