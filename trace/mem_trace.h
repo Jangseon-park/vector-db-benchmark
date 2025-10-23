@@ -16,12 +16,22 @@
 #define MMAP_SIZE (PAGE_SIZE + DATA_SIZE)
 #define barrier() _mm_mfence()
 
+struct perf_sample {
+    perf_event_header header;
+    uint32_t pid;
+    uint32_t tid;
+    uint64_t timestamp;
+    uint64_t addr;
+    uint64_t value;
+    uint64_t time_enabled;
+    uint64_t phys_addr;
+};
 
 class MemTracer{
 public:
-    MemTracer(int tid, pid_t pid, int sample_period);
+    MemTracer(int tid, pid_t pid, int sample_period, const std::string outdir, const std::string& outfile);
     ~MemTracer();
-    int read(std::ofstream &out);
+    int read();
     int start();
     int stop();
 
@@ -34,6 +44,8 @@ private:
     size_t rdlen{};
     size_t mplen{};
     perf_event_mmap_page *mp;
+    std::ofstream output;
+    std::vector<perf_sample> samples;
     };
 
 

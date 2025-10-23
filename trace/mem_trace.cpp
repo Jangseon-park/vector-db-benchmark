@@ -6,23 +6,15 @@
 #include <linux/perf_event.h>
 #include <sys/syscall.h>
 #include <cstring>
+#include <utility>
 #include <memory.h>
-struct perf_sample {
-    perf_event_header header;
-    uint32_t pid;
-    uint32_t tid;
-    uint64_t timestamp;
-    uint64_t addr;
-    uint64_t value;
-    uint64_t time_enabled;
-    uint64_t phys_addr;
-};
+#include <filesystem>
 
 long perf_event_open(struct perf_event_attr *event_attr, pid_t pid, int cpu, int group_fd, unsigned long flags) {
     return syscall(__NR_perf_event_open, event_attr, pid, cpu, group_fd, flags);
 }
 
-MemTracer::MemTracer(int tid, pid_t pid, int sample_period)
+MemTracer::MemTracer(int tid, pid_t pid, int sample_period, const std::string outdir, const std::string& outfile)
     : tid(tid), pid(pid), sample_period(sample_period), seq(0), rdlen(0), mplen(0), mp(nullptr)
 {
     perf_event_attr pe = {};
@@ -31,12 +23,14 @@ MemTracer::MemTracer(int tid, pid_t pid, int sample_period)
     pe.type = PERF_TYPE_HW_CACHE;
     pe.size = sizeof(struct perf_event_attr);
     //pe.config = (0x01 << 8) | 0x34; // UMask: 0x01, EventCode: 0x34
-    pe.config = PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16);
+    //pe.config = PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16);
+    pe.config = PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8);
     pe.sample_period = static_cast<uint64_t>(sample_period);
     pe.sample_type = PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ADDR | PERF_SAMPLE_READ | PERF_SAMPLE_PHYS_ADDR;
     pe.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
     pe.disabled = 1; // Event is initially disabled
     //pe.exclude_user = 1;
+    pe.exclude_kernel = 1;
     pe.precise_ip = 2; // 0: skid, 1: constant skid, 2: try to be precise
     //pe.config1 = 0x00001fc1; // UMaskExt for UNC_CHA_LLC_LOOKUP.DATA_READ_MISS
     int cpu = 0; // measure on any cpu
@@ -63,6 +57,17 @@ MemTracer::MemTracer(int tid, pid_t pid, int sample_period)
     if (this->start() < 0) {
         std::cerr << "start failed" << std::endl;
         perror("start");
+        throw;
+    }
+
+    if (!std::filesystem::exists(outdir)) {
+        std::filesystem::create_directories(outdir);
+    }
+
+    this->output.open(outdir + "/" + outfile);
+    std::cout << "output dir:" << outdir + "/" + outfile << std::endl;
+    if (!this->output.is_open()) {
+        std::cerr << "Failed to open output file." << std::endl;
         throw;
     }
 }
@@ -117,11 +122,21 @@ MemTracer::~MemTracer() {
         this->fd = -1;
     }
 
+
+    for (const auto &sample : this->samples) {
+        this->output << "pid:" << sample.pid << " tid:" << sample.tid << " time:" << sample.time_enabled << " addr:" << sample.addr << " phys_addr:" << sample.phys_addr << " accumulated_time:" << sample.value << " timestamp:" << sample.timestamp << std::endl;
+        std::cout << "pid:" << sample.pid << " tid:" << sample.tid << " time:" << sample.time_enabled << " addr:" << sample.addr << " phys_addr:" << sample.phys_addr << " accumulated_time:" << sample.value << " timestamp:" << sample.timestamp << std::endl;
+    }
+
+    if (this->output.is_open()) {
+        this->output.close();
+    }
+
     this->pid = -1;
 }
 
 
-int MemTracer::read(std::ofstream &out) {
+int MemTracer::read() {
     if (this->fd < 0) {
         return 0;
     }
@@ -160,8 +175,8 @@ int MemTracer::read(std::ofstream &out) {
                 }
                 std::cout << "received PERF_RECORD_SAMPLE" << std::endl;
                 if (static_cast<uint32_t>(this->pid) == data->pid) {
-                    out << "pid:" << data->pid << " tid:" << data->tid << " time:" << data->time_enabled << " addr:" << data->addr << " phys_addr:" << data->phys_addr << " llc_miss:" << data->value << " timestamp:" << data->timestamp << std::endl;
-                    std::cout << "pid:" << data->pid << " tid:" << data->tid << " time:" << data->time_enabled << " addr:" << data->addr << " phys_addr:" << data->phys_addr << " llc_miss:" << data->value << " timestamp:" << data->timestamp << std::endl;
+                    this->samples.push_back(std::move(*data));
+                    //std::cout << "pid:" << data->pid << " tid:" << data->tid << " time:" << data->time_enabled << " addr:" << data->addr << " phys_addr:" << data->phys_addr << "accumulated time:" << data->value << " timestamp:" << data->timestamp << std::endl;
                 } else {
                     std::cout << "pid mismatch. expected:" << this->pid << " actual:" << data->pid << std::endl;
                 }

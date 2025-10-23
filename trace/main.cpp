@@ -12,17 +12,12 @@ int main() {
     // so we can just pass 'pid'. The perf event will be for the whole process.
     int tid = pid; 
     int sample_period = 1000;
-
+    std::string outdir = std::filesystem::current_path().string();
+    std::string outfile = "mem_trace.txt";
     try {
         std::cout << "Starting memory tracer for current process (PID: " << pid << ")" << std::endl;
 
-        MemTracer tracer(tid, pid, sample_period);
-
-        std::ofstream outfile("mem_trace_output.txt");
-        if (!outfile.is_open()) {
-            std::cerr << "Failed to open output file." << std::endl;
-            return 1;
-        }
+        MemTracer tracer(tid, pid, sample_period, outdir, outfile);
 
         std::cout << "Tracer started. Generating memory traffic for 10 seconds..." << std::endl;
         std::vector<int> memory_hog;
@@ -31,14 +26,14 @@ int main() {
             for(int j=0; j<10000; ++j) {
                 memory_hog.push_back(j);
             }
-            tracer.read(outfile);
+            tracer.read();
             sleep(1);
             std::cout << "." << std::flush;
         }
         std::cout << std::endl;
 
         // Final read to get any remaining events
-        tracer.read(outfile);
+        tracer.read();
         tracer.stop();
         std::cout << "Stopping tracer." << std::endl;
 
