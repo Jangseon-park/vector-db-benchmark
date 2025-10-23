@@ -27,22 +27,23 @@ MemTracer::MemTracer(int tid, pid_t pid, int sample_period)
 {
     perf_event_attr pe = {};
     memset(&pe, 0, sizeof(struct perf_event_attr));
-    pe.type = PERF_TYPE_RAW;
+    //pe.type = PERF_TYPE_RAW;
+    pe.type = PERF_TYPE_HW_CACHE;
     pe.size = sizeof(struct perf_event_attr);
-    pe.config = (0x13 << 8) | 0x34;
+    //pe.config = (0x01 << 8) | 0x34; // UMask: 0x01, EventCode: 0x34
+    pe.config = PERF_COUNT_HW_CACHE_L1D | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16);
     pe.sample_period = static_cast<uint64_t>(sample_period);
     pe.sample_type = PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ADDR | PERF_SAMPLE_READ | PERF_SAMPLE_PHYS_ADDR;
     pe.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED;
     pe.disabled = 1; // Event is initially disabled
-    pe.exclude_user = 0;
-    pe.exclude_kernel = 1;
-    pe.precise_ip = 3; // 0: skid, 1: constant skid, 2: try to be precise
-    pe.config1 = 3; // LLC miss
-    int cpu = -1; // measure on any cpu
+    //pe.exclude_user = 1;
+    pe.precise_ip = 2; // 0: skid, 1: constant skid, 2: try to be precise
+    //pe.config1 = 0x00001fc1; // UMaskExt for UNC_CHA_LLC_LOOKUP.DATA_READ_MISS
+    int cpu = 0; // measure on any cpu
     int group_fd = -1;
     unsigned long flags = 0;
 
-    this->fd = perf_event_open(&pe, this->pid, cpu, group_fd, flags);
+    this->fd = perf_event_open(&pe, this->pid, -1, group_fd, flags);
     if (this->fd == -1) {
         std::cerr << "perf_event_open failed" << std::endl;
         perror("perf_event_open");
@@ -138,7 +139,6 @@ int MemTracer::read(std::ofstream &out) {
     do {
         std::cout << "reading mem_trace" << std::endl;
         this->seq = this->mp->lock; // explicit copy
-        
         barrier();
         last_head = this->mp->data_head;
         std::cout << "last_head:" << last_head << std::endl;
