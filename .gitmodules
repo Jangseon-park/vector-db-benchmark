@@ -1,0 +1,3 @@
+[submodule "mem-trace"]
+	path = mem-trace
+	url = git@github.com:Jangseon-park/mem-trace.git
