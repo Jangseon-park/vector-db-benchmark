@@ -1,10 +1,32 @@
 [
   {
-    "name": "milvus-default-self",
+    "name": "milvus-default-scann",
     "engine": "milvus",
     "connection_params": {},
     "collection_params": {},
-    "search_params": [{ "parallel": 1, "config": { "ef": 128 } }, { "parallel": 100, "config": { "ef": 128 } }],
-    "upload_params": { "parallel": 16, "index_params": { "efConstruction": 100, "M": 16 }, "index_type": "IVF_FLAT"}
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 128 } }, { "parallel": 100, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "parallel": 16, "index_params": { "efConstruction": 100, "M": 16, "nlist": 1024 }, "index_type": "SCANN"}
+  },
+  {
+    "name": "milvus-default-ivf_flat",
+    "engine": "milvus",
+    "connection_params": {},
+    "collection_params": {},
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 128 } }, { "parallel": 100, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "parallel": 16, "index_params": { "nlist": 1024 }, "index_type": "IVF_FLAT"}
+  },
+  {
+    "name": "milvus-default-hnsw",
+    "engine": "milvus",
+    "connection_params": {},
+    "collection_params": {},
+    "search_params": [
+      { "parallel": 1, "config": { "ef": 128 } }, { "parallel": 100, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "parallel": 16, "index_params": { "efConstruction": 100, "M": 16 }, "index_type": "HNSW"}
   }
 ]

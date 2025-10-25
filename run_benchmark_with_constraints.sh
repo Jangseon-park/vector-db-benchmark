@@ -16,10 +16,10 @@ SLICE_PATH="/etc/systemd/system.control/$SLICE_FILE"
 VENV_PATH="/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
 
 # Engine name to pass to the benchmark script
-ENGINE_NAME="milvus-default"
+ENGINE_NAME="milvus-default-ivf_flat"
 # Dataset to use for the benchmark (e.g., "glove-100-angular")
 # You can find more datasets in the `datasets` directory or the project's documentation.
-DATASET_NAME="glove-100-angular"
+DATASET_NAME="glove-25-angular"
 
 # --- Script ---
 
