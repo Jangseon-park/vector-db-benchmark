@@ -1,0 +1,14 @@
+[
+  {
+    "name": "weaviate-default-self",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 256, "maxConnections": 16 } },
+    "search_params": [
+      { "parallel": 8, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  }
+]

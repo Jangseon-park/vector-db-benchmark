@@ -1,0 +1,15 @@
+[
+  {
+    "name": "opensearch-default-self",
+    "engine": "opensearch",
+    "connection_params": {
+      "request_timeout": 10000
+    },
+    "collection_params": { "method": { "parameters": { "m": 16, "ef_construction": 100 } } },
+"search_params": [
+      { "parallel": 1, "config": { "knn.algo_param.ef_search": 128 } },
+      { "parallel": 100, "config": { "knn.algo_param.ef_search": 128 } }
+    ],
+    "upload_params": { "parallel": 16 }
+  }
+]

@@ -3,6 +3,7 @@ version: '3.5'
 services:
   es:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    cgroup_parent: ex.slice
     environment:
       ELASTIC_PASSWORD: "passwd"
       KIBANA_PASSWORD: "passwd"

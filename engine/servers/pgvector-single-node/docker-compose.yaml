@@ -4,6 +4,7 @@ services:
   pgvector:
     container_name: pgvector
     image: pgvector/pgvector:0.6.2-pg16
+    cgroup_parent: ex.slice
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
