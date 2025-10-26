@@ -9,6 +9,8 @@ import os
 import time
 import sys
 import threading
+from util.Amplifier import Amplifier
+from util.Prober import Prober
 
 class BenchmarkRunner:
     """
@@ -24,7 +26,7 @@ class BenchmarkRunner:
         self.slice_file = None
         self.slice_path = None
         self.python_exec = None
-        self.run_py_script = "run.py"
+        self.run_py_script = "/home/wolf/workspace/vector-db-benchmark/run.py"
         self.commands = {}
 
     def _create_commands(self):
@@ -176,12 +178,12 @@ class BenchmarkRunner:
 
 
 if __name__ == "__main__":
-    
     # --- Configuration ---
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
     server_list = ["milvus", "qdrant", "weaviate", "pgvector"]
     for server in server_list:
-        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+        COMPOSE_FILE = os.path.join(script_dir, f"engine/servers/{server}-single-node/docker-compose.yaml")
         SLICE_NAME = "ex.slice"
         VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
         ENGINE_NAME = f"{server}-default-self"
