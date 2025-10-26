@@ -8,27 +8,24 @@ import subprocess
 import os
 import time
 import sys
+import threading
 
 class BenchmarkRunner:
     """
     Encapsulates the logic for running the vector-db-benchmark with cgroup constraints.
     """
-    def __init__(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
-        # --- Configuration ---
-        self.compose_file = compose_file
-        self.slice_name = slice_name
-        self.engine_name = engine_name
-        self.dataset_name = dataset_name
-        self.venv_path = venv_path
-
-        self.slice_file = f"{self.slice_name}.d"
-        self.slice_path = f"/etc/systemd/system.control/{self.slice_file}"
-        
-        # --- Script paths ---
-        self.python_exec = os.path.join(self.venv_path, "bin/python")
+    def __init__(self):
+        """Initializes the BenchmarkRunner."""
+        self.compose_file = None
+        self.slice_name = None
+        self.engine_name = None
+        self.dataset_name = None
+        self.venv_path = None
+        self.slice_file = None
+        self.slice_path = None
+        self.python_exec = None
         self.run_py_script = "run.py"
-
-        self.commands = self._create_commands()
+        self.commands = {}
 
     def _create_commands(self):
         """Creates a dictionary of commands to be executed."""
@@ -48,27 +45,35 @@ class BenchmarkRunner:
 
     def run_command(self, command, check=True):
         """Runs a command, streams its output, and raises an exception on failure."""
+        
+        def stream_reader(pipe, output_list, stream_to_print):
+            """Reads lines from a pipe, appends them to a list, and prints them to a stream."""
+            for line in iter(pipe.readline, ''):
+                stream_to_print.write(line)
+                output_list.append(line)
+            pipe.close()
+
         print(f"Executing: {' '.join(command)}")
         try:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             
-            # Real-time printing of stdout
-            for line in iter(process.stdout.readline, ''):
-                print(line, end='')
-            
-            # Real-time printing of stderr
-            stderr_output = ""
-            for line in iter(process.stderr.readline, ''):
-                stderr_output += line
-                print(line, end='', file=sys.stderr)
+            stdout_output = []
+            stderr_output = []
 
-            process.stdout.close()
-            process.stderr.close()
+            stdout_thread = threading.Thread(target=stream_reader, args=(process.stdout, stdout_output, sys.stdout))
+            stderr_thread = threading.Thread(target=stream_reader, args=(process.stderr, stderr_output, sys.stderr))
+
+            stdout_thread.start()
+            stderr_thread.start()
+
+            stdout_thread.join()
+            stderr_thread.join()
             
             return_code = process.wait()
             
             if check and return_code != 0:
-                raise subprocess.CalledProcessError(return_code, command, output=None, stderr=stderr_output)
+                full_stderr = "".join(stderr_output)
+                raise subprocess.CalledProcessError(return_code, command, output=None, stderr=full_stderr)
                 
         except FileNotFoundError:
             print(f"Error: Command not found: {command[0]}", file=sys.stderr)
@@ -80,8 +85,22 @@ class BenchmarkRunner:
                 print(f"stderr:\n{e.stderr}", file=sys.stderr)
             raise
 
-    def run(self):
+    def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
         """Main function to run the benchmark with constraints."""
+        # --- Configuration ---
+        self.compose_file = compose_file
+        self.slice_name = slice_name
+        self.engine_name = engine_name
+        self.dataset_name = dataset_name
+        self.venv_path = venv_path
+
+        self.slice_file = f"{self.slice_name}.d"
+        self.slice_path = f"/etc/systemd/system.control/{self.slice_file}"
+        
+        # --- Script paths ---
+        self.python_exec = os.path.join(self.venv_path, "bin/python")
+        self.commands = self._create_commands()
+
         if not os.path.exists(self.run_py_script) or not os.path.exists(self.compose_file):
             print(f"This script must be run from the 'vector-db-benchmark' directory.", file=sys.stderr)
             sys.exit(1)
@@ -133,14 +152,14 @@ if __name__ == "__main__":
     COMPOSE_FILE = "engine/servers/milvus-single-node/docker-compose.yaml"
     SLICE_NAME = "ex.slice"
     VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
-    ENGINE_NAME = "milvus-default-ivf_flat"
+    ENGINE_NAME = "milvus-default-hnsw"
     DATASET_NAME = "glove-25-angular"
 
-    runner = BenchmarkRunner(
+    runner = BenchmarkRunner()
+    runner.run(
         compose_file=COMPOSE_FILE,
         slice_name=SLICE_NAME,
         engine_name=ENGINE_NAME,
         dataset_name=DATASET_NAME,
         venv_path=VENV_PATH
     )
-    runner.run()
