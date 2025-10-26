@@ -114,7 +114,7 @@ class BenchmarkRunner:
         self._run_command(self.commands["rm_slice_path"], check=False)
         self._run_command(self.commands["systemctl_daemon_reload"], check=False)
 
-    def _wrapup(self):
+    def wrapup(self):
         """Cleans up all resources after the benchmark is finished."""
         print("🧹 Benchmark finished. Cleaning up...")
         try:
@@ -161,21 +161,38 @@ class BenchmarkRunner:
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"\n Benchmark run failed: {e}", file=sys.stderr)
         finally:
-            self._wrapup()
+            self.wrapup()
+
+    def prepare(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
+        try:
+            self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
+            self._cleanup_before_run()
+            self._start_engine()
+            self._set_constraints()
+            self._upload_dataset()
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"\n Benchmark prepare failed: {e}", file=sys.stderr)
+
+
 
 if __name__ == "__main__":
+    
     # --- Configuration ---
-    COMPOSE_FILE = "engine/servers/milvus-single-node/docker-compose.yaml"
-    SLICE_NAME = "ex.slice"
-    VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
-    ENGINE_NAME = "milvus-default-hnsw"
-    DATASET_NAME = "glove-25-angular"
 
-    runner = BenchmarkRunner()
-    runner.run(
-        compose_file=COMPOSE_FILE,
-        slice_name=SLICE_NAME,
-        engine_name=ENGINE_NAME,
-        dataset_name=DATASET_NAME,
-        venv_path=VENV_PATH
-    )
+    server_list = ["milvus", "qdrant", "weaviate", "pgvector"]
+    for server in server_list:
+        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+        SLICE_NAME = "ex.slice"
+        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
+        ENGINE_NAME = f"{server}-default-self"
+        DATASET_NAME = "glove-25-angular"
+        runner = BenchmarkRunner()
+        runner.prepare(
+            compose_file=COMPOSE_FILE,
+            slice_name=SLICE_NAME,
+            engine_name=ENGINE_NAME,
+            dataset_name=DATASET_NAME,
+            venv_path=VENV_PATH
+        )
+        runner.search_dataset()
+        runner.wrapup()
