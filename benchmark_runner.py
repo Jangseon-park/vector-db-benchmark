@@ -43,7 +43,7 @@ class BenchmarkRunner:
             "search": [self.python_exec, self.run_py_script, "--engines", self.engine_name, "--datasets", self.dataset_name, "--skip-upload", "--drop-caches"]
         }
 
-    def run_command(self, command, check=True):
+    def _run_command(self, command, check=True):
         """Runs a command, streams its output, and raises an exception on failure."""
         
         def stream_reader(pipe, output_list, stream_to_print):
@@ -85,67 +85,83 @@ class BenchmarkRunner:
                 print(f"stderr:\n{e.stderr}", file=sys.stderr)
             raise
 
-    def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
-        """Main function to run the benchmark with constraints."""
-        # --- Configuration ---
+
+    def _prepare(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
         self.compose_file = compose_file
         self.slice_name = slice_name
         self.engine_name = engine_name
         self.dataset_name = dataset_name
         self.venv_path = venv_path
-
+        
         self.slice_file = f"{self.slice_name}.d"
         self.slice_path = f"/etc/systemd/system.control/{self.slice_file}"
-        
-        # --- Script paths ---
         self.python_exec = os.path.join(self.venv_path, "bin/python")
         self.commands = self._create_commands()
 
         if not os.path.exists(self.run_py_script) or not os.path.exists(self.compose_file):
+            print(f"run_py_script: {self.run_py_script}")
+            print(f"compose_file: {self.compose_file}")
             print(f"This script must be run from the 'vector-db-benchmark' directory.", file=sys.stderr)
             sys.exit(1)
+            
+    def _cleanup_before_run(self):
+        """Ensures a clean environment before the benchmark starts."""
+        print("🧹 Ensuring a clean environment by stopping any running containers...")
+        self._run_command(self.commands["docker_compose_down"], check=False)
 
+        print("🧹 Resetting any failed cgroup slice from previous runs...")
+        self._run_command(self.commands["systemctl_stop"], check=False)
+        self._run_command(self.commands["rm_slice_path"], check=False)
+        self._run_command(self.commands["systemctl_daemon_reload"], check=False)
+
+    def _wrapup(self):
+        """Cleans up all resources after the benchmark is finished."""
+        print("🧹 Benchmark finished. Cleaning up...")
         try:
-            print("🧹 Ensuring a clean environment by stopping any running containers...")
-            self.run_command(self.commands["docker_compose_down"])
-
-            print("🧹 Resetting any failed cgroup slice from previous runs...")
-            self.run_command(self.commands["systemctl_stop"], check=False)
-            self.run_command(self.commands["rm_slice_path"])
-            self.run_command(self.commands["systemctl_daemon_reload"])
-
-            print("🚀 Starting database engine using docker-compose...")
-            self.run_command(self.commands["docker_compose_up"])
-            
-            print("⏳ Waiting for the cgroup slice to be created (5 seconds)...")
-            time.sleep(5)
-
-            print("🛠️ Applying resource constraints to the cgroup slice...")
-            try:
-                self.run_command(self.commands["set_property"])
-                print(f"Successfully applied AllowedMemoryNodes=2 and AllowedCPUs from node 0 to {self.slice_name}.")
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                print("Failed to apply systemctl properties. Cleaning up...", file=sys.stderr)
-                sys.exit(1)
-
-            print(f"Uploading the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
-            self.run_command(self.commands["upload"])
-            
-            print(f"Searching the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
-            self.run_command(self.commands["search"])
-
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            print("\n Benchmark run failed.", file=sys.stderr)
-            sys.exit(1)
-        finally:
-            print("\n🧹 Benchmark finished. Cleaning up...")
-            self.run_command(self.commands["docker_compose_down"], check=False)
-
-            print("🧹 Stopping the cgroup slice...")
-            self.run_command(self.commands["systemctl_stop"], check=False)
-            self.run_command(self.commands["rm_slice_path"], check=False)
-            self.run_command(self.commands["systemctl_daemon_reload"], check=False)
+            self._run_command(self.commands["docker_compose_down"], check=False)
+            self._run_command(self.commands["systemctl_stop"], check=False)
+            self._run_command(self.commands["rm_slice_path"], check=False)
+            self._run_command(self.commands["systemctl_daemon_reload"], check=False)
             print("Script completed successfully.")
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"\n Benchmark wrapup failed: {e}", file=sys.stderr)
+
+    def _start_engine(self):
+        """Starts the database engine and waits for it to initialize."""
+        print("🚀 Starting database engine using docker-compose...")
+        self._run_command(self.commands["docker_compose_up"])
+        print("⏳ Waiting for engine to initialize (2 seconds)...")
+        time.sleep(2)
+        print("🧹 Engine started successfully.")
+    
+    def _set_constraints(self):
+        print("🛠️ Applying resource constraints to the cgroup slice...")
+        self._run_command(self.commands["set_property"])
+        print(f"Successfully applied AllowedMemoryNodes=2 and AllowedCPUs from node 0 to {self.slice_name}.")
+        print("🧹 Constraints set successfully.")
+    
+    def _upload_dataset(self):
+        print(f"Uploading the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
+        self._run_command(self.commands["upload"])
+        print("🧹 Dataset uploaded successfully.")
+    
+    def search_dataset(self):
+        print(f"Searching the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
+        self._run_command(self.commands["search"])
+        print("🧹 Dataset searched successfully.")
+    
+    def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
+        self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)   
+        try:
+            self._cleanup_before_run()
+            self._start_engine()
+            self._set_constraints()
+            self._upload_dataset()
+            self.search_dataset()
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"\n Benchmark run failed: {e}", file=sys.stderr)
+        finally:
+            self._wrapup()
 
 if __name__ == "__main__":
     # --- Configuration ---

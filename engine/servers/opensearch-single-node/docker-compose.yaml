@@ -2,8 +2,8 @@ version: '3.5'
 
 services:
   opensearch:
-    image: opensearchproject/opensearch:2.10.0
-    cgroup_parent: ex.slice
+    image: opensearchproject/opensearch:3.3.1
+    #cgroup_parent: ex.slice
     environment:
       discovery.type: "single-node"
       plugins.security.disabled: true
