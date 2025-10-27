@@ -9,14 +9,15 @@ import os
 import time
 import sys
 import threading
-from util.Amplifier import Amplifier
-from util.Prober import Prober
+from contention.Amplifier import Amplifier
+from contention.Prober import Prober
+from contention.Utils import Utils
 
 class BenchmarkRunner:
     """
     Encapsulates the logic for running the vector-db-benchmark with cgroup constraints.
     """
-    def __init__(self):
+    def __init__(self, result_path, max_ch_num):
         """Initializes the BenchmarkRunner."""
         self.compose_file = None
         self.slice_name = None
@@ -26,8 +27,10 @@ class BenchmarkRunner:
         self.slice_file = None
         self.slice_path = None
         self.python_exec = None
-        self.run_py_script = "/home/wolf/workspace/vector-db-benchmark/run.py"
+        self.run_py_script = "run.py"
         self.commands = {}
+        self.result_path = result_path
+        self.max_channel_num = max_ch_num
 
     def _create_commands(self):
         """Creates a dictionary of commands to be executed."""
@@ -175,26 +178,54 @@ class BenchmarkRunner:
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"\n Benchmark prepare failed: {e}", file=sys.stderr)
 
+    def bench(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node):
+        for channel_num in range(0, self.max_channel_num):
+            result_path = f"{self.result_path}/{channel_num}"
+            prober = Prober(result_path, target_numa_node, channel_num)
+            amplifier = Amplifier(result_path, target_numa_node, channel_num)
+            prober.build()
+            prober.confirm_build_success()
+            amplifier.build()
+            amplifier.confirm_build_success()
+            self.prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
+            amplifier.start()
+            time.sleep(10) 
+            for index in range(3):
+                #self.search_dataset()
+                print(f"run test iteration:{index}")
+                result_path_tmp = f"{result_path}/{time.strftime('%Y%m%d_%H%M%S')}-{target_numa_node}-{index}.csv"
+                prober.reset_cmd(result_path_tmp)
+                prober.start()
+                time.sleep(300)
+                prober.stop()
+                
+                utils = Utils()
+                df = utils.parse_log_file(result_path_tmp)
+                utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
+                print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
+            self.wrapup()
+
 
 
 if __name__ == "__main__":
     # --- Configuration ---
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    server_list = ["milvus", "qdrant", "weaviate", "pgvector"]
+    server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
+    target_numa = 2
+    max_ch = 1
     for server in server_list:
-        COMPOSE_FILE = os.path.join(script_dir, f"engine/servers/{server}-single-node/docker-compose.yaml")
+        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
         SLICE_NAME = "ex.slice"
         VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
         ENGINE_NAME = f"{server}-default-self"
         DATASET_NAME = "glove-25-angular"
-        runner = BenchmarkRunner()
-        runner.prepare(
+        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/checktrend/{server}"
+        runner = BenchmarkRunner(result_path, max_ch)
+        runner.bench(
             compose_file=COMPOSE_FILE,
             slice_name=SLICE_NAME,
             engine_name=ENGINE_NAME,
             dataset_name=DATASET_NAME,
-            venv_path=VENV_PATH
+            venv_path=VENV_PATH,
+            target_numa_node = target_numa
         )
-        runner.search_dataset()
-        runner.wrapup()
+       
