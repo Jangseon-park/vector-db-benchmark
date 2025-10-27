@@ -13,7 +13,7 @@ from contention.Amplifier import Amplifier
 from contention.Prober import Prober
 from contention.Utils import Utils
 from contention.Utils import run as run_sudo_cmd
-
+from multiprocessing import Process
 
 class BenchmarkRunner:
     """
@@ -44,6 +44,7 @@ class BenchmarkRunner:
             "systemctl_daemon_reload": "sudo systemctl daemon-reload",
             "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=2 AllowedCPUs=0-19",
             "upload": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-search"],
+            #"search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
             "search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
         }
 
@@ -96,7 +97,7 @@ class BenchmarkRunner:
         self.engine_name = engine_name
         self.dataset_name = dataset_name
         self.venv_path = venv_path
-        
+        self.utils = Utils()
         self.slice_file = f"{self.slice_name}.d"
         self.slice_path = f"/etc/systemd/system.control/{self.slice_file}"
         self.python_exec = os.path.join(self.venv_path, "bin/python")
@@ -152,7 +153,16 @@ class BenchmarkRunner:
     def search_dataset(self):
         print(f"Searching the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
         self._run_command(self.commands["search"])
-        print("🧹 Dataset searched successfully.")
+        #self.search_process = Process(target=self.utils.run_proc, args=(self.commands["search"],))
+        #self.search_process.start()
+        print("Search started.")
+        
+    def stop_search(self):
+        print("Stopping search...")
+        cmd = f"sudo pkill -f {self.run_py_script}"
+        run_sudo_cmd(cmd, sudo=True)
+        print("Search stopped.")
+
     
     def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
         self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)   
@@ -188,27 +198,25 @@ class BenchmarkRunner:
             amplifier.confirm_build_success()
             self.prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
             amplifier.start()
-            time.sleep(10) 
-            for index in range(200):
-                #self.search_dataset()
+            time.sleep(10)
+            for index in range(5):
                 print(f"run test iteration:{index}")
                 result_path_tmp = f"{result_path}/{time.strftime('%Y%m%d_%H%M%S')}-{target_numa_node}-{index}.csv"
                 prober.reset_cmd(result_path_tmp)
                 prober.start()
-                time.sleep(timeout)
+                self.search_dataset()
                 prober.stop()
-                if index % 10 == 0:
-                    utils = Utils()
-                    df = utils.parse_log_file(result_path_tmp)
-                    utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
-                    print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
+                utils = Utils()
+                df = utils.parse_log_file(result_path_tmp)
+                utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
+                print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
             self.wrapup()
-
 
 
 if __name__ == "__main__":
     # --- Configuration ---
-    server_list = ["weaviate", "pgvector", "milvus"]
+    #server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
+    server_list = ["weaviate"] # all servers
     target_numa = 2
     max_ch = 1
     timeout = 30
@@ -218,7 +226,7 @@ if __name__ == "__main__":
         VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
         ENGINE_NAME = f"{server}-default-self"
         DATASET_NAME = "glove-25-angular"
-        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/idle/{server}"
+        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search/{server}"
         runner = BenchmarkRunner(result_path, max_ch)
         runner.bench(
             compose_file=COMPOSE_FILE,

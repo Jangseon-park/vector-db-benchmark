@@ -7,7 +7,7 @@
       "optimizers_config": { "memmap_threshold": 10000000 }
     },
     "search_params": [
-      { "parallel": 8, "config": { "hnsw_ef": 128 } }
+      { "parallel": 1, "config": { "hnsw_ef": 128 } }
     ],
     "upload_params": { "parallel": 16, "batch_size": 1024 }
   }
