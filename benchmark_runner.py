@@ -12,6 +12,8 @@ import threading
 from contention.Amplifier import Amplifier
 from contention.Prober import Prober
 from contention.Utils import Utils
+from contention.Utils import run as run_sudo_cmd
+from multiprocessing import Process
 
 class BenchmarkRunner:
     """
@@ -35,17 +37,15 @@ class BenchmarkRunner:
     def _create_commands(self):
         """Creates a dictionary of commands to be executed."""
         return {
-            "docker_compose_down": ["sudo", "docker", "compose", "-f", self.compose_file, "down", "--remove-orphans", "-v"],
-            "docker_compose_up": ["sudo", "docker", "compose", "-f", self.compose_file, "up", "-d"],
-            "systemctl_stop": ["sudo", "systemctl", "stop", self.slice_name],
-            "rm_slice_path": ["sudo", "rm", "-rf", self.slice_path],
-            "systemctl_daemon_reload": ["sudo", "systemctl", "daemon-reload"],
-            "set_property": [
-                "sudo", "systemctl", "set-property", self.slice_name,
-                "AllowedMemoryNodes=2", "AllowedCPUs=0-19"
-            ],
-            "upload": [self.python_exec, self.run_py_script, "--engines", self.engine_name, "--datasets", self.dataset_name, "--skip-search"],
-            "search": [self.python_exec, self.run_py_script, "--engines", self.engine_name, "--datasets", self.dataset_name, "--skip-upload", "--drop-caches"]
+            "docker_compose_down": f"sudo docker compose -f {self.compose_file} down --remove-orphans -v",
+            "docker_compose_up": f"sudo docker compose -f {self.compose_file} up -d",
+            "systemctl_stop": f"sudo systemctl stop {self.slice_name}",
+            "rm_slice_path": f"sudo rm -rf {self.slice_path}",
+            "systemctl_daemon_reload": "sudo systemctl daemon-reload",
+            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=2 AllowedCPUs=0-19",
+            "upload": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-search"],
+            #"search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
+            "search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
         }
 
     def _run_command(self, command, check=True):
@@ -97,7 +97,7 @@ class BenchmarkRunner:
         self.engine_name = engine_name
         self.dataset_name = dataset_name
         self.venv_path = venv_path
-        
+        self.utils = Utils()
         self.slice_file = f"{self.slice_name}.d"
         self.slice_path = f"/etc/systemd/system.control/{self.slice_file}"
         self.python_exec = os.path.join(self.venv_path, "bin/python")
@@ -112,21 +112,21 @@ class BenchmarkRunner:
     def _cleanup_before_run(self):
         """Ensures a clean environment before the benchmark starts."""
         print("🧹 Ensuring a clean environment by stopping any running containers...")
-        self._run_command(self.commands["docker_compose_down"], check=False)
+        run_sudo_cmd(self.commands["docker_compose_down"], sudo=True)
 
         print("🧹 Resetting any failed cgroup slice from previous runs...")
-        self._run_command(self.commands["systemctl_stop"], check=False)
-        self._run_command(self.commands["rm_slice_path"], check=False)
-        self._run_command(self.commands["systemctl_daemon_reload"], check=False)
+        run_sudo_cmd(self.commands["systemctl_stop"], sudo=True)
+        run_sudo_cmd(self.commands["rm_slice_path"], sudo=True)
+        run_sudo_cmd(self.commands["systemctl_daemon_reload"], sudo=True)
 
     def wrapup(self):
         """Cleans up all resources after the benchmark is finished."""
         print("🧹 Benchmark finished. Cleaning up...")
         try:
-            self._run_command(self.commands["docker_compose_down"], check=False)
-            self._run_command(self.commands["systemctl_stop"], check=False)
-            self._run_command(self.commands["rm_slice_path"], check=False)
-            self._run_command(self.commands["systemctl_daemon_reload"], check=False)
+            run_sudo_cmd(self.commands["docker_compose_down"], sudo=True)
+            run_sudo_cmd(self.commands["systemctl_stop"], sudo=True)
+            run_sudo_cmd(self.commands["rm_slice_path"], sudo=True)
+            run_sudo_cmd(self.commands["systemctl_daemon_reload"], sudo=True)
             print("Script completed successfully.")
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"\n Benchmark wrapup failed: {e}", file=sys.stderr)
@@ -134,14 +134,14 @@ class BenchmarkRunner:
     def _start_engine(self):
         """Starts the database engine and waits for it to initialize."""
         print("🚀 Starting database engine using docker-compose...")
-        self._run_command(self.commands["docker_compose_up"])
+        run_sudo_cmd(self.commands["docker_compose_up"], sudo=True)
         print("⏳ Waiting for engine to initialize (2 seconds)...")
         time.sleep(2)
         print("🧹 Engine started successfully.")
     
     def _set_constraints(self):
         print("🛠️ Applying resource constraints to the cgroup slice...")
-        self._run_command(self.commands["set_property"])
+        run_sudo_cmd(self.commands["set_property"], sudo=True)
         print(f"Successfully applied AllowedMemoryNodes=2 and AllowedCPUs from node 0 to {self.slice_name}.")
         print("🧹 Constraints set successfully.")
     
@@ -153,7 +153,16 @@ class BenchmarkRunner:
     def search_dataset(self):
         print(f"Searching the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
         self._run_command(self.commands["search"])
-        print("🧹 Dataset searched successfully.")
+        #self.search_process = Process(target=self.utils.run_proc, args=(self.commands["search"],))
+        #self.search_process.start()
+        print("Search started.")
+        
+    def stop_search(self):
+        print("Stopping search...")
+        cmd = f"sudo pkill -f {self.run_py_script}"
+        run_sudo_cmd(cmd, sudo=True)
+        print("Search stopped.")
+
     
     def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
         self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)   
@@ -178,7 +187,7 @@ class BenchmarkRunner:
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"\n Benchmark prepare failed: {e}", file=sys.stderr)
 
-    def bench(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node):
+    def bench(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node, timeout):
         for channel_num in range(0, self.max_channel_num):
             result_path = f"{self.result_path}/{channel_num}"
             prober = Prober(result_path, target_numa_node, channel_num)
@@ -189,16 +198,14 @@ class BenchmarkRunner:
             amplifier.confirm_build_success()
             self.prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
             amplifier.start()
-            time.sleep(10) 
-            for index in range(3):
-                #self.search_dataset()
+            time.sleep(10)
+            for index in range(5):
                 print(f"run test iteration:{index}")
                 result_path_tmp = f"{result_path}/{time.strftime('%Y%m%d_%H%M%S')}-{target_numa_node}-{index}.csv"
                 prober.reset_cmd(result_path_tmp)
                 prober.start()
-                time.sleep(300)
+                self.search_dataset()
                 prober.stop()
-                
                 utils = Utils()
                 df = utils.parse_log_file(result_path_tmp)
                 utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
@@ -206,19 +213,20 @@ class BenchmarkRunner:
             self.wrapup()
 
 
-
 if __name__ == "__main__":
     # --- Configuration ---
-    server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
+    #server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
+    server_list = ["weaviate"] # all servers
     target_numa = 2
     max_ch = 1
+    timeout = 30
     for server in server_list:
         COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
         SLICE_NAME = "ex.slice"
         VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
         ENGINE_NAME = f"{server}-default-self"
         DATASET_NAME = "glove-25-angular"
-        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/checktrend/{server}"
+        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search/{server}"
         runner = BenchmarkRunner(result_path, max_ch)
         runner.bench(
             compose_file=COMPOSE_FILE,
@@ -226,6 +234,7 @@ if __name__ == "__main__":
             engine_name=ENGINE_NAME,
             dataset_name=DATASET_NAME,
             venv_path=VENV_PATH,
-            target_numa_node = target_numa
+            target_numa_node = target_numa,
+            timeout = timeout
         )
        
