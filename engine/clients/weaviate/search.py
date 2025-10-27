@@ -18,24 +18,21 @@ class WeaviateSearcher(BaseSearcher):
     collection: Collection
     client: WeaviateClient
 
-    @classmethod
-    def init_client(cls, host, distance, connection_params: dict, search_params: dict):
+    def __init__(self, host, distance, connection_params: dict, search_params: dict):
         url = f"http://{host}:{connection_params.get('port', WEAVIATE_DEFAULT_PORT)}"
-        client = WeaviateClient(
+        self.client = WeaviateClient(
             ConnectionParams.from_url(url, 50051), skip_init_checks=True
         )
-        client.connect()
-        cls.collection = client.collections.get(
+        self.client.connect()
+        self.collection = self.client.collections.get(
             WEAVIATE_CLASS_NAME, skip_argument_validation=True
         )
-        cls.search_params = search_params
-        cls.client = client
+        self.search_params = search_params
 
-    @classmethod
-    def search_one(cls, query: Query, top: int) -> List[Tuple[int, float]]:
-        res = cls.collection.query.near_vector(
+    def search_one(self, query: Query, top: int) -> List[Tuple[int, float]]:
+        res = self.collection.query.near_vector(
             near_vector=query.vector,
-            filters=cls.parser.parse(query.meta_conditions),
+            filters=self.parser.parse(query.meta_conditions),
             limit=top,
             return_metadata=MetadataQuery(distance=True),
             return_properties=[],
@@ -49,7 +46,6 @@ class WeaviateSearcher(BaseSearcher):
             )
         )
 
-    @classmethod
-    def delete_client(cls):
-        if cls.client is not None:
-            cls.client.close()
+    def delete_client(self):
+        if self.client is not None:
+            self.client.close()

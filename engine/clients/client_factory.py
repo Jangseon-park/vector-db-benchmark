@@ -86,28 +86,43 @@ class ClientFactory(ABC):
         )
         return engine_uploader
 
-    def _create_searchers(self, experiment) -> List[BaseSearcher]:
+    def _create_searchers(self, experiment, dataset_config) -> List[BaseSearcher]:
         engine_searcher_class: Type[BaseSearcher] = ENGINE_SEARCHERS[
             experiment["engine"]
         ]
 
-        engine_searchers = [
-            engine_searcher_class(
-                self.host,
-                connection_params={**experiment.get("connection_params", {})},
-                search_params=search_params,
-            )
-            for search_params in experiment.get("search_params", [{}])
-        ]
+        search_params_list = experiment.get("search_params", [{}])
+        
+        # Special case for WeaviateSearcher which needs the distance
+        if experiment["engine"] == "weaviate":
+            distance = dataset_config.get("distance")
+            engine_searchers = [
+                engine_searcher_class(
+                    self.host,
+                    distance=distance,
+                    connection_params={**experiment.get("connection_params", {})},
+                    search_params=search_params,
+                )
+                for search_params in search_params_list
+            ]
+        else:
+            engine_searchers = [
+                engine_searcher_class(
+                    self.host,
+                    connection_params={**experiment.get("connection_params", {})},
+                    search_params=search_params,
+                )
+                for search_params in search_params_list
+            ]
 
         return engine_searchers
 
-    def build_client(self, experiment, drop_caches: bool = False):
+    def build_client(self, experiment, dataset_config, drop_caches: bool = False):
         return BaseClient(
             name=experiment["name"],
             engine=experiment["engine"],
             configurator=self._create_configurator(experiment),
             uploader=self._create_uploader(experiment),
-            searchers=self._create_searchers(experiment),
+            searchers=self._create_searchers(experiment, dataset_config),
             drop_caches=drop_caches,
         )
