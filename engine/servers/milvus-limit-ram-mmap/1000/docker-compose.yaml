@@ -39,6 +39,7 @@ services:
     container_name: milvus-standalone-1000
     image: milvusdb/milvus:v2.4.1
     command: ["milvus", "run", "standalone"]
+    cgroup_parent: ex.slice
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000

@@ -19,6 +19,8 @@ import logging
 import requests
 import sys
 import re
+import invoke
+
 from benchmark.config_read import read_dataset_config, read_engine_configs
 from pymilvus import utility, connections, Collection
 from engine.clients.milvus.config import (
@@ -171,11 +173,12 @@ def upload_dataset(dataset_name: str, engine_name: str):
     return path
 
 
-def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: int):
+def run_profile(dataset_name: str, engine_name: str, size: int, iteration_num: int, llc: int):
     path = os.path.dirname(__file__)
     # Use sys.executable to ensure we are using the same python interpreter
     # that is running this script (which is the one from the poetry venv)
-    output_path = os.path.join(path, f"profile_results/{dataset_name}/{size}", f"{engine_name}_{iteration_num}.txt")
+    #output_path = os.path.join(path, f"profile_results/{dataset_name}/{size}", f"{engine_name}_{iteration_num}.txt")
+    output_path = os.path.join(path, f"profile_results/{dataset_name}/{llc}", f"{engine_name}_{iteration_num}.txt")
     if not os.path.exists(os.path.dirname(output_path)):
         os.makedirs(os.path.dirname(output_path))
 
@@ -285,34 +288,81 @@ def init_docker_containers(size: int, dataset_name: str, engine_name: str):
     confirm_loaded(dataset_name, engine_name, size)
     stop_docker_containers(size)
 
+def run(cmd, sudo=False, *args, **kwargs):
+    kwargs.setdefault("echo", True)
+
+    if not sudo:
+        return invoke.run(cmd, *args, **kwargs)
+    else:
+        HOST_PASSWORD = "Pjs19571!"
+        sudo_pass_responder = invoke.Responder(
+            pattern=r"\[sudo\] password:.*", response=f"{HOST_PASSWORD}\n"
+        )
+        if HOST_PASSWORD == "unknown_host":
+            print(
+                "Please set the user password from env 'USER_PASSWORD'"
+                "and call  again"
+            )
+            raise typer.Exit(1)
+
+        kwargs.setdefault("pty", True)
+        kwargs.setdefault("watchers", [sudo_pass_responder])
+        return invoke.sudo(
+            cmd,
+            *args,
+            **kwargs,
+        )
+
+def create_commands():
+    """Creates a dictionary of commands to be executed."""
+    return {
+        "systemctl_stop": f"sudo systemctl stop ex.slice",
+        "rm_slice_path": f"sudo rm -rf /etc/systemd/system.control/ex.slice.d",
+        "systemctl_daemon_reload": "sudo systemctl daemon-reload",
+        "set_property": f"sudo systemctl set-property ex.slice AllowedMemoryNodes=0 AllowedCPUs=0-15",
+    }
+
 def test():
     engine_config = ["milvus-default-self"]
     dataset_config = [
-        #"glove-25-angular",
+        "glove-25-angular",
         #"gist-960-angular",
-        "dbpedia-openai-1M-1536-angular",
+        #"dbpedia-openai-1M-1536-angular",
     ]
+
+
     #size_config = [5000, 4000, 3000, 2000, 1800, 1600, 1400, 1300, 1200, 1100, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]
-    size_config = [4600, 4200, 4000, 3800, 3600, 3400, 3200, 3000, 2800, 2600, 2400, 2200, 2000, 1800, 1600, 1400, 1200, 1000]
+    size_config = [1000]
     #size_config = [9000, 8000, 7000, 6000, 5000, 4000, 3000, 2000, 1000]
+    llc_mapping = [0x7fff, 0xfff, 0xff, 0xf, 0x1]
     iteration_num = 1
+    commands = create_commands()
+    # reset the slice
+
     for dataset_name in dataset_config:
         set_environment(dataset_name)
         for engine_name in engine_config:
             init_docker_containers(10000, dataset_name, engine_name)
             for size in size_config:
-                for i in range(iteration_num):
-                    print(f"Running iteration {i} of {iteration_num} for {dataset_name} with {engine_name} and size {size}")
-                    try:
-                        is_exist = start_docker_containers(size)
-                        if not is_exist:
-                            upload_dataset(dataset_name, engine_name)
-                        confirm_loaded(dataset_name, engine_name, size)
-                        run_profile(dataset_name, engine_name, size, i)
-                        stop_docker_containers(size)
-                    finally:
-                        # Ensure containers are stopped even if there is an error
-                        stop_docker_containers(size)
+                for llc in llc_mapping:
+                    cmd = f"sudo pqos -R && sudo pqos -e 'llc@0:1={llc};' && sudo pqos -a 'llc:1=0-15;' && sudo pqos -s"
+                    run(cmd, sudo=True)
+                    for i in range(iteration_num):
+                        print(f"Running iteration {i} of {iteration_num} for {dataset_name} with {engine_name} and size {size} and llc {hex(llc)} and iteration {i}")
+                        try:
+                            run(commands["systemctl_stop"], sudo=True)
+                            run(commands["rm_slice_path"], sudo=True)
+                            run(commands["systemctl_daemon_reload"], sudo=True)
+                            is_exist = start_docker_containers(size)
+                            run(commands["set_property"], sudo=True)
+                            if not is_exist:
+                                upload_dataset(dataset_name, engine_name)
+                            confirm_loaded(dataset_name, engine_name, size)
+                            run_profile(dataset_name, engine_name, size, i, llc)
+                            stop_docker_containers(size)
+                        finally:
+                            # Ensure containers are stopped even if there is an error
+                            stop_docker_containers(size)
 
 
 if __name__ == "__main__":
