@@ -19,7 +19,7 @@ class BenchmarkRunner:
     """
     Encapsulates the logic for running the vector-db-benchmark with cgroup constraints.
     """
-    def __init__(self, result_path, max_ch_num):
+    def __init__(self, result_path, start_ch, end_ch):
         """Initializes the BenchmarkRunner."""
         self.compose_file = None
         self.slice_name = None
@@ -32,8 +32,8 @@ class BenchmarkRunner:
         self.run_py_script = "run.py"
         self.commands = {}
         self.result_path = result_path
-        self.max_channel_num = max_ch_num
-
+        self.start_channel_num = start_ch
+        self.end_channel_num = end_ch
     def _create_commands(self):
         """Creates a dictionary of commands to be executed."""
         return {
@@ -42,10 +42,10 @@ class BenchmarkRunner:
             "systemctl_stop": f"sudo systemctl stop {self.slice_name}",
             "rm_slice_path": f"sudo rm -rf {self.slice_path}",
             "systemctl_daemon_reload": "sudo systemctl daemon-reload",
-            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=2 AllowedCPUs=0-19",
+            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=2 AllowedCPUs=0-31",
             "upload": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-search"],
-            #"search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
-            "search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
+            "search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
+            #"search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
         }
 
     def _run_command(self, command, check=True):
@@ -152,9 +152,9 @@ class BenchmarkRunner:
     
     def search_dataset(self):
         print(f"Searching the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
-        self._run_command(self.commands["search"])
-        #self.search_process = Process(target=self.utils.run_proc, args=(self.commands["search"],))
-        #self.search_process.start()
+        #self._run_command(self.commands["search"])
+        self.search_process = Process(target=self.utils.run_proc, args=(self.commands["search"],))
+        self.search_process.start()
         print("Search started.")
         
     def stop_search(self):
@@ -188,7 +188,7 @@ class BenchmarkRunner:
             print(f"\n Benchmark prepare failed: {e}", file=sys.stderr)
 
     def bench(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node, timeout):
-        for channel_num in range(0, self.max_channel_num):
+        for channel_num in range(self.start_channel_num, self.end_channel_num):
             result_path = f"{self.result_path}/{channel_num}"
             prober = Prober(result_path, target_numa_node, channel_num)
             amplifier = Amplifier(result_path, target_numa_node, channel_num)
@@ -199,35 +199,39 @@ class BenchmarkRunner:
             self.prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
             amplifier.start()
             time.sleep(10)
-            for index in range(5):
+            for index in range(0, 100):
                 print(f"run test iteration:{index}")
                 result_path_tmp = f"{result_path}/{time.strftime('%Y%m%d_%H%M%S')}-{target_numa_node}-{index}.csv"
                 prober.reset_cmd(result_path_tmp)
                 prober.start()
                 self.search_dataset()
+                time.sleep(timeout)
                 prober.stop()
-                utils = Utils()
-                df = utils.parse_log_file(result_path_tmp)
-                utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
-                print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
+                self.stop_search()
+                if index % 10 == 0:
+                    utils = Utils()
+                    df = utils.parse_log_file(result_path_tmp)
+                    utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
+                    print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
             self.wrapup()
 
 
 if __name__ == "__main__":
     # --- Configuration ---
     #server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
-    server_list = ["weaviate"] # all servers
+    server_list = ["milvus"] # all servers
     target_numa = 2
-    max_ch = 1
-    timeout = 30
+    start_ch = 0
+    end_ch = 2
+    timeout = 15
     for server in server_list:
         COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
         SLICE_NAME = "ex.slice"
-        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
+        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
         ENGINE_NAME = f"{server}-default-self"
         DATASET_NAME = "glove-25-angular"
-        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search/{server}"
-        runner = BenchmarkRunner(result_path, max_ch)
+        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-samelength/{server}"
+        runner = BenchmarkRunner(result_path, start_ch, end_ch)
         runner.bench(
             compose_file=COMPOSE_FILE,
             slice_name=SLICE_NAME,
