@@ -10,5 +10,41 @@
       { "parallel": 8, "config": { "ef": 128 } }
     ],
     "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-default-self-m-16",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 128, "maxConnections": 16 } },
+    "search_params": [
+      { "parallel": 8, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  }
+  {
+    "name": "weaviate-default-self-m-32",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 128, "maxConnections": 32 } },
+    "search_params": [
+      { "parallel": 8, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
+  },
+  {
+    "name": "weaviate-default-self-m-64",
+    "engine": "weaviate",
+    "connection_params": {
+      "timeout_config": 1000
+    },
+    "collection_params": { "vectorIndexConfig": { "efConstruction": 128, "maxConnections": 64 } },
+    "search_params": [
+      { "parallel": 8, "config": { "ef": 128 } }
+    ],
+    "upload_params": { "batch_size": 1024, "parallel": 8 }
   }
 ]
