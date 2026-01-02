@@ -37,7 +37,7 @@ class Prober:
 
     def stop(self):
         print("Stopping prober...")
-        cmd = "sudo pkill -f contention/user_reader"
+        cmd = "pkill -x user_reader || true"
         run(cmd, sudo=True)
 
     def join(self):
