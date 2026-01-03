@@ -219,7 +219,7 @@ class BenchmarkRunner:
 if __name__ == "__main__":
     # --- Configuration ---
     #server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
-    server_list = ["milvus"] # all servers
+    server_list = ["qdrant"] # all servers
     target_numa = 2
     start_ch = 0
     end_ch = 1
@@ -243,14 +243,15 @@ if __name__ == "__main__":
     #            target_numa_node = target_numa,
     #            timeout = timeout
     #        )
+    
     for server in server_list:
-        for index_type in ["IVF_FLAT", "IVF_SQ8", "IVF_PQ", "DISKANN", "HNSW"]:
+        for dimension in [768, 960]:
             COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
             SLICE_NAME = "ex.slice"
             VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
-            ENGINE_NAME = f"{server}-default-self-{index_type}"
-            DATASET_NAME = "glove-25-angular"
-            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-index/{server}-{index_type}"
+            ENGINE_NAME = f"{server}-default-self-dimension"
+            DATASET_NAME = f"gist-{dimension}-angular"
+            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-dimension/{server}-dimension-{dimension}"
             runner = BenchmarkRunner(result_path, start_ch, end_ch)
             runner.bench(
                 compose_file=COMPOSE_FILE,
@@ -261,4 +262,22 @@ if __name__ == "__main__":
                 target_numa_node = target_numa,
                 timeout = timeout
             )
+    #for server in server_list:
+    #    for index_type in ["IVF_FLAT", "IVF_SQ8", "IVF_PQ", "DISKANN", "HNSW"]:
+    #        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+    #        SLICE_NAME = "ex.slice"
+    #        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+    #        ENGINE_NAME = f"{server}-default-self-{index_type}"
+    #        DATASET_NAME = "glove-25-angular"
+    #        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-index/{server}-{index_type}"
+    #        runner = BenchmarkRunner(result_path, start_ch, end_ch)
+    #        runner.bench(
+    #            compose_file=COMPOSE_FILE,
+    #            slice_name=SLICE_NAME,
+    #            engine_name=ENGINE_NAME,
+    #            dataset_name=DATASET_NAME,
+    #            venv_path=VENV_PATH,
+    #            target_numa_node = target_numa,
+    #            timeout = timeout
+    #       )
        

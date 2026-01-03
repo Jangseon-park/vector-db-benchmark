@@ -49,5 +49,19 @@
       { "parallel": 8, "config": { "hnsw_ef": 128 } }
     ],
     "upload_params": { "parallel": 16, "batch_size": 1024 }
+  },
+  {
+    "name": "qdrant-default-self-dimension",
+    "engine": "qdrant",
+    "connection_params": { "timeout": 30 },
+    "collection_params": {
+      "optimizers_config": { "memmap_threshold": 10000000 },
+      "hnsw_config": { "m": 64, "ef_construct": 128 }
+    },
+    "search_params": [
+      { "parallel": 1, "config": { "hnsw_ef": 128 } }, { "parallel": 100, "config": { "hnsw_ef": 128 } },{ "parallel": 1, "config": { "hnsw_ef": 256 } }, { "parallel": 100, "config": { "hnsw_ef": 256 } },
+      { "parallel": 1, "config": { "hnsw_ef": 512 } }, { "parallel": 100, "config": { "hnsw_ef": 512 } }
+    ],
+    "upload_params": { "parallel": 16, "batch_size": 1024 }
   }
 ]
