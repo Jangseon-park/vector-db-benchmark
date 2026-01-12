@@ -19,7 +19,10 @@
 #define SCAN_DELAY_S 300ULL
 #endif
 
+#ifndef NUMA_NODE
 #define NUMA_NODE 2
+#endif
+
 #define BLOCK_NUM 4096
 #define STRIDE_SIZE (128 * 1024)
 #ifndef CHANNEL_NUM

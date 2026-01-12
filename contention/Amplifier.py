@@ -3,7 +3,7 @@ import shutil
 from multiprocessing import Process
 from contention.Utils import Utils
 from contention.Utils import run
-
+from contention.smt import turn_off_smt, turn_on_smt
 
 class Amplifier:
     @staticmethod
@@ -52,15 +52,15 @@ class Amplifier:
                 self.cmd_for_cache_partitioning = (
                     "pqos -R && "
                     "pqos -e 'llc@0:1=0x7ff0;llc@0:2=0x0000f;' && "
-                    "pqos -a 'llc:1=10-19;llc:2=0-9;' && "
+                    "pqos -a 'llc:1=5-9;llc:2=0-4;' && "
                     "pqos -s"
                 )
             else:
                 self.cmd_for_cache_partitioning = None
-        self.run_cmd = f"taskset -c 0-9 contention//user_amplifier"
+        self.run_cmd = f"taskset -c 0-15 contention/user_amplifier"
 
     def build(self):
-        if os.path.exists("contention//user_amplifier"):
+        if os.path.exists("contention/user_amplifier"):
             os.remove("contention//user_amplifier")
         print("Building amplifier...")
         self.build_process = Process(target=self.utils.run_proc, args=(self.cmd_for_build,))
@@ -70,6 +70,7 @@ class Amplifier:
 
     def start(self):
         print("Starting amplifier...")
+        turn_off_smt()
         if getattr(self, "cmd_for_cache_partitioning", None):
             run(self.cmd_for_cache_partitioning, sudo=True)
         self.run_process = Process(target=self.utils.run_proc, args=(self.run_cmd,))
@@ -84,6 +85,7 @@ class Amplifier:
         print("Stopping amplifier...")
         cmd = "pkill -x user_amplifier || true"
         run(cmd, sudo=True)
+        turn_on_smt()
 
     def confirm_build_success(self):
         while True:

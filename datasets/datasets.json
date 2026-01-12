@@ -36,8 +36,36 @@
     "vector_size": 960,
     "distance": "l2",
     "type": "h5",
-    "path": "gist-960-euclidean/gist-960-euclidean.hdf5",
+    "path": "/dev/shm/gist-960-euclidean/gist-960-euclidean.hdf5",
     "link": "http://ann-benchmarks.com/gist-960-euclidean.hdf5"
+  },
+  {
+    "name": "gist-128-euclidean",
+    "vector_size": 128,
+    "distance": "l2",
+    "type": "h5",
+    "path": "/dev/shm/gist-128-euclidean/gist-128-euclidean.hdf5"
+  },
+  {
+    "name": "gist-256-euclidean",
+    "vector_size": 256,
+    "distance": "l2",
+    "type": "h5",
+    "path": "/dev/shm/gist-256-euclidean/gist-256-euclidean.hdf5"
+  },
+  {
+    "name": "gist-512-euclidean",
+    "vector_size": 512,
+    "distance": "l2",
+    "type": "h5",
+    "path": "/dev/shm/gist-512-euclidean/gist-512-euclidean.hdf5"
+  },
+  {
+    "name": "gist-768-euclidean",
+    "vector_size": 768,
+    "distance": "l2",
+    "type": "h5",
+    "path": "/dev/shm/gist-768-euclidean/gist-768-euclidean.hdf5"
   },
   {
     "name": "gist-960-angular",
