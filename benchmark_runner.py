@@ -42,7 +42,7 @@ class BenchmarkRunner:
             "systemctl_stop": f"sudo systemctl stop {self.slice_name}",
             "rm_slice_path": f"sudo rm -rf {self.slice_path}",
             "systemctl_daemon_reload": "sudo systemctl daemon-reload",
-            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=2 AllowedCPUs=0-31",
+            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=2 AllowedCPUs=0-19",
             "upload": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-search"],
             "search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
             #"search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
@@ -214,43 +214,57 @@ class BenchmarkRunner:
                     utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
                     print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
             self.wrapup()
+            amplifier.stop()
 
-
-if __name__ == "__main__":
-    # --- Configuration ---
-    #server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
-    server_list = ["qdrant"] # all servers
-    target_numa = 2
-    start_ch = 0
-    end_ch = 1
-    timeout = 105
-    
-    #for server in server_list:
-    #    for m in [16, 32, 64]:
-    #        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
-    #        SLICE_NAME = "ex.slice"
-    #        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
-    #        ENGINE_NAME = f"{server}-default-self-m-{m}"
-    #        DATASET_NAME = "glove-25-angular"
-    #        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-linknum/{server}-m-{m}"
-    #        runner = BenchmarkRunner(result_path, start_ch, end_ch)
-    #        runner.bench(
-    #            compose_file=COMPOSE_FILE,
-    #            slice_name=SLICE_NAME,
-    #            engine_name=ENGINE_NAME,
-    #            dataset_name=DATASET_NAME,
-    #            venv_path=VENV_PATH,
-    #            target_numa_node = target_numa,
-    #            timeout = timeout
-    #        )
-    
+def run_server_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["milvus", "qdrant", "weaviate"]
     for server in server_list:
-        for dimension in [768, 960]:
+        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+        SLICE_NAME = "ex.slice"
+        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+        ENGINE_NAME = f"{server}-default-self"
+        DATASET_NAME = "glove-25-angular"
+        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-model/{server}"
+        runner = BenchmarkRunner(result_path, start_ch, end_ch)
+        runner.bench(
+            compose_file=COMPOSE_FILE,
+            slice_name=SLICE_NAME,
+            engine_name=ENGINE_NAME,
+            dataset_name=DATASET_NAME,
+            venv_path=VENV_PATH,
+            target_numa_node = target_numa_node,
+            timeout = timeout
+        )
+def run_linknum_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["qdrant"]
+    for server in server_list:
+        for m in [16, 32, 64, 96]:
+            COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+            SLICE_NAME = "ex.slice"
+            VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+            ENGINE_NAME = f"{server}-default-self-m-{m}"
+            DATASET_NAME = "glove-25-angular"
+            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-linknum/{server}-m-{m}"
+            runner = BenchmarkRunner(result_path, start_ch, end_ch)
+            runner.bench(
+                compose_file=COMPOSE_FILE,
+                slice_name=SLICE_NAME,
+                engine_name=ENGINE_NAME,
+                dataset_name=DATASET_NAME,
+                venv_path=VENV_PATH,
+                target_numa_node = target_numa_node,
+                timeout = timeout
+            )
+
+def run_dimension_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["qdrant"]
+    for server in server_list:
+        for dimension in [128, 256, 512, 768]:
             COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
             SLICE_NAME = "ex.slice"
             VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
             ENGINE_NAME = f"{server}-default-self-dimension"
-            DATASET_NAME = f"gist-{dimension}-angular"
+            DATASET_NAME = f"gist-{dimension}-euclidean"
             result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-dimension/{server}-dimension-{dimension}"
             runner = BenchmarkRunner(result_path, start_ch, end_ch)
             runner.bench(
@@ -259,25 +273,39 @@ if __name__ == "__main__":
                 engine_name=ENGINE_NAME,
                 dataset_name=DATASET_NAME,
                 venv_path=VENV_PATH,
-                target_numa_node = target_numa,
+                target_numa_node = target_numa_node,
                 timeout = timeout
             )
-    #for server in server_list:
-    #    for index_type in ["IVF_FLAT", "IVF_SQ8", "IVF_PQ", "DISKANN", "HNSW"]:
-    #        COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
-    #        SLICE_NAME = "ex.slice"
-    #        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
-    #        ENGINE_NAME = f"{server}-default-self-{index_type}"
-    #        DATASET_NAME = "glove-25-angular"
-    #        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-index/{server}-{index_type}"
-    #        runner = BenchmarkRunner(result_path, start_ch, end_ch)
-    #        runner.bench(
-    #            compose_file=COMPOSE_FILE,
-    #            slice_name=SLICE_NAME,
-    #            engine_name=ENGINE_NAME,
-    #            dataset_name=DATASET_NAME,
-    #            venv_path=VENV_PATH,
-    #            target_numa_node = target_numa,
-    #            timeout = timeout
-    #       )
-       
+
+def run_index_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["milvus"]
+    for server in server_list:
+        for index_type in ["IVF_FLAT", "IVF_SQ8", "IVF_PQ", "DISKANN", "HNSW"]:
+            COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+            SLICE_NAME = "ex.slice"
+            VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+            ENGINE_NAME = f"{server}-default-self-{index_type}"
+            DATASET_NAME = "glove-25-angular"
+            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-index/{server}-{index_type}"
+            runner = BenchmarkRunner(result_path, start_ch, end_ch)
+            runner.bench(
+                compose_file=COMPOSE_FILE,
+                slice_name=SLICE_NAME,
+                engine_name=ENGINE_NAME,
+                dataset_name=DATASET_NAME,
+                venv_path=VENV_PATH,
+                target_numa_node = target_numa_node,
+                timeout = timeout
+            )
+
+
+if __name__ == "__main__":
+    # --- Configuration ---
+    target_numa = 2
+    start_ch = 0
+    end_ch = 1
+    timeout = 100
+    #run_server_bench(target_numa, timeout, start_ch, end_ch)
+    run_linknum_bench(target_numa, timeout, start_ch, end_ch)
+    run_dimension_bench(target_numa, timeout, start_ch, end_ch)
+    run_index_bench(target_numa, timeout, start_ch, end_ch)
