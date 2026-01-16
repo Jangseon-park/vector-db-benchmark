@@ -17,10 +17,10 @@ class Prober:
         os.makedirs(self.result_path, exist_ok=True)
         self.utils = Utils()
         self.cmd_for_build = f"gcc contention/user_reader.c -o contention/user_reader -lnuma -DSCAN_DELAY_S=100 -DNUMA_NODE={numa_node} -DCHANNEL_NUM={channel_num}"
-        self.run_cmd = f"taskset -c 10-19 contention/user_reader > {self.result_path}"
+        self.run_cmd = f"taskset -c 8-19 contention/user_reader > {self.result_path}"
 
     def reset_cmd(self, result_path: str):
-        self.run_cmd = f"taskset -c 10-19 contention/user_reader > {result_path}"
+        self.run_cmd = f"taskset -c 8-19 contention/user_reader > {result_path}"
 
     def build(self):
         if os.path.exists("contention/user_reader"):

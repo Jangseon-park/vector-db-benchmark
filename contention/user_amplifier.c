@@ -62,6 +62,7 @@ static inline __attribute__((always_inline)) void pch_clflushopt(void *addr)
 }
 
 
+/*
 static inline void load_mem(uint64_t *base_addr, uint64_t block_num, uint64_t stride_size)
 {
     uint64_t accessed_block_num = 0;
@@ -84,6 +85,24 @@ static inline void load_mem(uint64_t *base_addr, uint64_t block_num, uint64_t st
         curr_addr = (uint64_t *)((uint64_t)curr_addr + stride_size);
     }
 }
+*/
+static inline void load_mem(uint64_t *base_addr, uint64_t block_num, uint64_t stride_size)
+{
+    long size_cnt = 0;
+    uint8_t *curr_addr = (uint8_t *)base_addr;
+    while (size_cnt < block_num * stride_size) {
+      asm volatile("vmovntdqa  0x0(%0), %%zmm0\n\t"
+                   "vmovntdqa  0x40(%0), %%zmm1\n\t"
+                   "vmovntdqa  0x80(%0), %%zmm2\n\t"
+                   "vmovntdqa  0xc0(%0), %%zmm3\n\t"
+                   :
+                   : "r"(curr_addr + size_cnt)
+                   : "zmm0", "zmm1", "zmm2", "zmm3", "memory");
+      size_cnt += 0x100;
+    }
+}
+
+
 
 int main() 
 {
