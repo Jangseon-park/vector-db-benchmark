@@ -9,8 +9,6 @@ import os
 import time
 import sys
 import threading
-from pathlib import Path
-import re
 from contention.Amplifier import Amplifier
 from contention.Prober import Prober
 from contention.Utils import Utils
@@ -21,7 +19,7 @@ class BenchmarkRunner:
     """
     Encapsulates the logic for running the vector-db-benchmark with cgroup constraints.
     """
-    def __init__(self, result_path, max_ch_num):
+    def __init__(self, result_path, start_ch, end_ch):
         """Initializes the BenchmarkRunner."""
         self.compose_file = None
         self.slice_name = None
@@ -34,10 +32,8 @@ class BenchmarkRunner:
         self.run_py_script = "run.py"
         self.commands = {}
         self.result_path = result_path
-        self.max_channel_num = max_ch_num
-        self.allowed_cpus = None
-        self.allowed_memory_nodes = None
-
+        self.start_channel_num = start_ch
+        self.end_channel_num = end_ch
     def _create_commands(self):
         """Creates a dictionary of commands to be executed."""
         return {
@@ -46,73 +42,11 @@ class BenchmarkRunner:
             "systemctl_stop": f"sudo systemctl stop {self.slice_name}",
             "rm_slice_path": f"sudo rm -rf {self.slice_path}",
             "systemctl_daemon_reload": "sudo systemctl daemon-reload",
-            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes={self.allowed_memory_nodes} AllowedCPUs={self.allowed_cpus}",
+            "set_property": f"sudo systemctl set-property {self.slice_name} AllowedMemoryNodes=1 AllowedCPUs=16-63",
             "upload": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-search"],
-            #"search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
-            "search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
+            "search": f"{self.python_exec} {self.run_py_script} --engines {self.engine_name} --datasets {self.dataset_name} --skip-upload --drop-caches"
+            #"search": [f"{self.python_exec}", f"{self.run_py_script}", "--engines", f"{self.engine_name}", "--datasets", f"{self.dataset_name}", "--skip-upload", "--drop-caches"]
         }
-
-    @staticmethod
-    def _extract_taskset_cpu_range_from_file(path: Path) -> str:
-        code = path.read_text(encoding="utf-8", errors="ignore")
-        m = re.search(r"taskset\s+-c\s+([0-9,\-]+)", code)
-        if not m:
-            raise RuntimeError(f"Could not find 'taskset -c ...' in {path}")
-        return m.group(1)
-
-    @staticmethod
-    def _parse_cpulist(s: str) -> set[int]:
-        s = s.strip()
-        if not s:
-            return set()
-        cpus: set[int] = set()
-        for part in s.split(","):
-            part = part.strip()
-            if not part:
-                continue
-            if "-" in part:
-                lo_s, hi_s = part.split("-", 1)
-                lo = int(lo_s)
-                hi = int(hi_s)
-                if hi < lo:
-                    raise ValueError(f"bad range {part!r}")
-                for c in range(lo, hi + 1):
-                    cpus.add(c)
-            else:
-                cpus.add(int(part))
-        return cpus
-
-    @staticmethod
-    def _format_cpulist(cpus: set[int]) -> str:
-        if not cpus:
-            return ""
-        xs = sorted(cpus)
-        ranges: list[str] = []
-        start = prev = xs[0]
-        for x in xs[1:]:
-            if x == prev + 1:
-                prev = x
-                continue
-            ranges.append(f"{start}-{prev}" if start != prev else f"{start}")
-            start = prev = x
-        ranges.append(f"{start}-{prev}" if start != prev else f"{start}")
-        return ",".join(ranges)
-
-    def _auto_detect_allowed_cpus_from_taskset(self) -> str:
-        """
-        Single source of truth: use the same taskset ranges that contention/amd_cat.py --auto-cpus uses.
-        AllowedCPUs should include BOTH Amplifier + Prober CPU sets (their union).
-        """
-        base = Path(__file__).resolve().parent
-        amp_path = base / "contention" / "Amplifier.py"
-        prob_path = base / "contention" / "Prober.py"
-        amp = self._extract_taskset_cpu_range_from_file(amp_path)
-        prob = self._extract_taskset_cpu_range_from_file(prob_path)
-        union = self._parse_cpulist(amp) | self._parse_cpulist(prob)
-        out = self._format_cpulist(union)
-        if not out:
-            raise RuntimeError(f"Computed empty AllowedCPUs from {amp_path} and {prob_path}")
-        return out
 
     def _run_command(self, command, check=True):
         """Runs a command, streams its output, and raises an exception on failure."""
@@ -157,7 +91,7 @@ class BenchmarkRunner:
             raise
 
 
-    def _prepare(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node=None):
+    def _prepare(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
         self.compose_file = compose_file
         self.slice_name = slice_name
         self.engine_name = engine_name
@@ -167,9 +101,6 @@ class BenchmarkRunner:
         self.slice_file = f"{self.slice_name}.d"
         self.slice_path = f"/etc/systemd/system.control/{self.slice_file}"
         self.python_exec = os.path.join(self.venv_path, "bin/python")
-        # Keep cgroup constraints in sync with contention/amd_cat.py --auto-cpus:
-        self.allowed_cpus = self._auto_detect_allowed_cpus_from_taskset()
-        self.allowed_memory_nodes = target_numa_node if target_numa_node is not None else 2
         self.commands = self._create_commands()
 
         if not os.path.exists(self.run_py_script) or not os.path.exists(self.compose_file):
@@ -211,10 +142,7 @@ class BenchmarkRunner:
     def _set_constraints(self):
         print("🛠️ Applying resource constraints to the cgroup slice...")
         run_sudo_cmd(self.commands["set_property"], sudo=True)
-        print(
-            f"Successfully applied AllowedMemoryNodes={self.allowed_memory_nodes} "
-            f"and AllowedCPUs={self.allowed_cpus} to {self.slice_name}."
-        )
+        print(f"Successfully applied AllowedMemoryNodes=2 and AllowedCPUs from node 0 to {self.slice_name}.")
         print("🧹 Constraints set successfully.")
     
     def _upload_dataset(self):
@@ -224,28 +152,20 @@ class BenchmarkRunner:
     
     def search_dataset(self):
         print(f"Searching the dataset for engine '{self.engine_name}' with dataset '{self.dataset_name}'...")
-        self._run_command(self.commands["search"])
-        #self.search_process = Process(target=self.utils.run_proc, args=(self.commands["search"],))
-        #self.search_process.start()
+        #self._run_command(self.commands["search"])
+        self.search_process = Process(target=self.utils.run_proc, args=(self.commands["search"],))
+        self.search_process.start()
         print("Search started.")
         
     def stop_search(self):
         print("Stopping search...")
-        # Avoid `pkill -f` matching its own command line; also don't fail if already stopped.
-        cmd = f"pkill -f '[r]un.py' || true"
+        cmd = f"sudo pkill -f {self.run_py_script}"
         run_sudo_cmd(cmd, sudo=True)
         print("Search stopped.")
 
     
-    def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node=None):
-        self._prepare(
-            compose_file,
-            slice_name,
-            engine_name,
-            dataset_name,
-            venv_path,
-            target_numa_node=target_numa_node,
-        )
+    def run(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
+        self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)   
         try:
             self._cleanup_before_run()
             self._start_engine()
@@ -257,16 +177,9 @@ class BenchmarkRunner:
         finally:
             self.wrapup()
 
-    def prepare(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node=None):
+    def prepare(self, compose_file, slice_name, engine_name, dataset_name, venv_path):
         try:
-            self._prepare(
-                compose_file,
-                slice_name,
-                engine_name,
-                dataset_name,
-                venv_path,
-                target_numa_node=target_numa_node,
-            )
+            self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
             self._cleanup_before_run()
             self._start_engine()
             self._set_constraints()
@@ -275,7 +188,7 @@ class BenchmarkRunner:
             print(f"\n Benchmark prepare failed: {e}", file=sys.stderr)
 
     def bench(self, compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node, timeout):
-        for channel_num in range(0, self.max_channel_num):
+        for channel_num in range(self.start_channel_num, self.end_channel_num):
             result_path = f"{self.result_path}/{channel_num}"
             prober = Prober(result_path, target_numa_node, channel_num)
             amplifier = Amplifier(result_path, target_numa_node, channel_num)
@@ -283,51 +196,117 @@ class BenchmarkRunner:
             prober.confirm_build_success()
             amplifier.build()
             amplifier.confirm_build_success()
-            # Ensure cgroup constraints use the same CPU sets as contention/amd_cat.py --auto-cpus,
-            # and tie memory nodes to this benchmark's target NUMA node.
-            self._prepare(compose_file, slice_name, engine_name, dataset_name, venv_path, target_numa_node=target_numa_node)
-            self._cleanup_before_run()
-            self._start_engine()
-            self._set_constraints()
-            self._upload_dataset()
+            self.prepare(compose_file, slice_name, engine_name, dataset_name, venv_path)
             amplifier.start()
             time.sleep(10)
-            for index in range(5):
+            for index in range(0, 100):
                 print(f"run test iteration:{index}")
                 result_path_tmp = f"{result_path}/{time.strftime('%Y%m%d_%H%M%S')}-{target_numa_node}-{index}.csv"
                 prober.reset_cmd(result_path_tmp)
                 prober.start()
                 self.search_dataset()
+                time.sleep(timeout)
                 prober.stop()
-                utils = Utils()
-                df = utils.parse_log_file(result_path_tmp)
-                utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
-                print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
+                self.stop_search()
+                if index % 1 == 0:
+                    utils = Utils()
+                    df = utils.parse_log_file(result_path_tmp)
+                    utils.plot_data_from_df(df, result_path_tmp.replace(".csv", ".pdf"))
+                    print(f"Plot saved to {result_path_tmp.replace('.csv', '.pdf')}") 
             self.wrapup()
+            amplifier.stop()
 
 
-if __name__ == "__main__":
-    # --- Configuration ---
-    #server_list = ["qdrant", "weaviate", "pgvector", "milvus"]
-    server_list = ["weaviate"] # all servers
-    target_numa = 2
-    max_ch = 1
-    timeout = 30
+def run_server_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["milvus", "qdrant", "weaviate"]
     for server in server_list:
         COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
         SLICE_NAME = "ex.slice"
-        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.10"
+        VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
         ENGINE_NAME = f"{server}-default-self"
         DATASET_NAME = "glove-25-angular"
-        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search/{server}"
-        runner = BenchmarkRunner(result_path, max_ch)
+        result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-model/{server}"
+        runner = BenchmarkRunner(result_path, start_ch, end_ch)
         runner.bench(
             compose_file=COMPOSE_FILE,
             slice_name=SLICE_NAME,
             engine_name=ENGINE_NAME,
             dataset_name=DATASET_NAME,
             venv_path=VENV_PATH,
-            target_numa_node = target_numa,
+            target_numa_node = target_numa_node,
             timeout = timeout
         )
-       
+def run_linknum_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["qdrant"]
+    for server in server_list:
+        for m in [16, 32, 64, 96]:
+            COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+            SLICE_NAME = "ex.slice"
+            VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+            ENGINE_NAME = f"{server}-default-self-m-{m}"
+            DATASET_NAME = "glove-25-angular"
+            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-linknum/{server}-m-{m}"
+            runner = BenchmarkRunner(result_path, start_ch, end_ch)
+            runner.bench(
+                compose_file=COMPOSE_FILE,
+                slice_name=SLICE_NAME,
+                engine_name=ENGINE_NAME,
+                dataset_name=DATASET_NAME,
+                venv_path=VENV_PATH,
+                target_numa_node = target_numa_node,
+                timeout = timeout
+            )
+
+def run_dimension_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["qdrant"]
+    for server in server_list:
+        for dimension in [128, 256, 512, 768]:
+            COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+            SLICE_NAME = "ex.slice"
+            VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+            ENGINE_NAME = f"{server}-default-self-dimension"
+            DATASET_NAME = f"gist-{dimension}-euclidean"
+            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-dimension/{server}-dimension-{dimension}"
+            runner = BenchmarkRunner(result_path, start_ch, end_ch)
+            runner.bench(
+                compose_file=COMPOSE_FILE,
+                slice_name=SLICE_NAME,
+                engine_name=ENGINE_NAME,
+                dataset_name=DATASET_NAME,
+                venv_path=VENV_PATH,
+                target_numa_node = target_numa_node,
+                timeout = timeout
+            )
+
+def run_index_bench(target_numa_node, timeout, start_ch, end_ch):
+    server_list = ["milvus"]
+    for server in server_list:
+        for index_type in ["IVF_SQ8", "IVF_PQ", "DISKANN", "HNSW"]:
+            COMPOSE_FILE = f"engine/servers/{server}-single-node/docker-compose.yaml"
+            SLICE_NAME = "ex.slice"
+            VENV_PATH = "/home/wolf/.cache/pypoetry/virtualenvs/vector-db-benchmark-3zx8bqwV-py3.11"
+            ENGINE_NAME = f"{server}-default-self-{index_type}"
+            DATASET_NAME = "glove-25-angular"
+            result_path = f"/home/wolf/workspace/cxl-contention-llm/vector-db-benchmark/contention-results/search-index/{server}-{index_type}"
+            runner = BenchmarkRunner(result_path, start_ch, end_ch)
+            runner.bench(
+                compose_file=COMPOSE_FILE,
+                slice_name=SLICE_NAME,
+                engine_name=ENGINE_NAME,
+                dataset_name=DATASET_NAME,
+                venv_path=VENV_PATH,
+                target_numa_node = target_numa_node,
+                timeout = timeout
+            )
+
+
+if __name__ == "__main__":
+    # --- Configuration ---
+    target_numa = 1
+    start_ch = 0
+    end_ch = 1
+    timeout = 100
+    #run_server_bench(target_numa, timeout, start_ch, end_ch)
+    #run_dimension_bench(target_numa, timeout, start_ch, end_ch)
+    #run_index_bench(target_numa, timeout, start_ch, end_ch)
+    run_linknum_bench(target_numa, timeout, start_ch, end_ch)
